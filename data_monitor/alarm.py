@@ -56,7 +56,7 @@ def format_baidu_hi(job, info):
         msg += [
             'reason: validator not pass',
             '-' * 20,
-            'validator is: ' + repr(job['validator']),
+            'validator is: ' + job['validator'].encode('utf8'),
             'result is: ' + repr(content), ]
 
     msg = '\n'.join(msg)
@@ -90,7 +90,9 @@ def format_email(job, info):
         content = str(content)
 
     with open(template_file, 'r') as f:
-        msg = f.read().format(job=job, content=content)
+        msg = f.read().format(
+            job=dict(job, validator=job['validator'].encode('utf8')),
+            content=content)
 
     return msg
 

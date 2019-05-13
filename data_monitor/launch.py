@@ -123,7 +123,7 @@ def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interva
 
         # 主循环，退出条件为作业队列为空，且线程池中没有残留作业
         while not task_queue.empty() or fs:
-            logger.info('****** pending: {}, running: {}, completed: {} ...'.format(task_queue.qsize(), len(fs), ncompleted))
+            logger.info('****** pending: {}, running: {}, completed: {} ******'.format(task_queue.qsize(), len(fs), ncompleted))
 
             # 如果任务队列非空，则轮询提取最近一个到期的作业，直到该作业到期
             if not task_queue.empty():
@@ -139,7 +139,7 @@ def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interva
 
             # 收集并处理执行完成的 job
             try:
-                for future in concurrent.futures.as_completed(fs, timeout=poll_interval if task_queue.empty() else 0.1):
+                for future in concurrent.futures.as_completed(fs, timeout=poll_interval if task_queue.empty() else 0.001):
                     ncompleted += 1
                     job = fs.pop(future)
                     try:
@@ -170,7 +170,7 @@ def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interva
             except concurrent.futures.TimeoutError:
                 pass
 
-        logger.info('****** pending: {}, running: {}, completed: {} ...'.format(task_queue.qsize(), len(fs), ncompleted))
+        logger.info('****** pending: {}, running: {}, completed: {} ******'.format(task_queue.qsize(), len(fs), ncompleted))
         logger.info('all jobs ({}) finished.'.format(ntotal))
         logger.info('=' * 60)
         logger.info('monitor exit.')
