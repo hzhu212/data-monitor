@@ -3,12 +3,13 @@
 """
 @Author:      zhuhe02
 @Email:       zhuhe02@baidu.com
-@Description: 处理 jinja2 渲染以及用户校验表达式的上下文
+@Description: 处理 jinja2 渲染器上下文，以及用户校验表达式上下文
 @CreateAt:    2019-04-01
 """
 
 
-# 保存自定义 jinja2 过滤器函数
+# 装饰器，支持用户自定义 jinja2 过滤器
+# ------------------------------------------------------------------------------
 _filters = []
 
 def register_filter(func):
@@ -17,8 +18,8 @@ def register_filter(func):
     return func
 
 
-
-# 保存自定义校验函数
+# 装饰器，支持用户自定义校验函数
+# ------------------------------------------------------------------------------
 _validators = []
 
 def register_validator(func):
@@ -27,7 +28,8 @@ def register_validator(func):
     return func
 
 
-
+# 获取上下文对象
+# ------------------------------------------------------------------------------
 def get_filter_context():
     """获取包含用户自定义过滤器的上下文环境"""
 

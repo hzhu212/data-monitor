@@ -14,9 +14,9 @@ import Queue
 import time
 import traceback
 
-import pandas
+import pandas as pd
 
-from .alarm import wrap_message, send_baidu_hi, send_email
+from .alarm import format_baidu_hi, send_baidu_hi, format_email, send_email
 from .config import get_job_conf_list
 from .context import get_validator_context
 from .db import get_connection
@@ -27,12 +27,17 @@ logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(name)s %(levelna
 logger = logging.getLogger('data_monitor')
 
 
-# 任务队列，构建为优先队列，使得作业能够按照到期时间排队
-task_queue = Queue.PriorityQueue()
+# 控制台打印表格时，如果行数超过 10，则使用省略号折叠
+pd.set_option('display.max_rows', 10)
+pd.set_option('display.width', 120)
 
 
 def run_job(job):
-    """执行一个作业"""
+    """执行一个作业。
+    返回一个 2-tuple，两个字段分别代表：
+        1. 是否校验成功；
+        2. 附加消息对象，解释校验失败的原因，用于发送警报。
+    """
 
     # 一个作业可能包含多个 SQL 查询
     results = []
@@ -69,102 +74,110 @@ def run_job(job):
     context = get_validator_context()
     context.update({'result': results})
     ret = eval(job['validator'], {'__builtins__': {}}, context)
+
     try:
+        # 如果用户 validator 中同时返回了 ok 和 info，则直接使用
         ok, info = ret
+
+        # 确保 info 为 ValidateFailInfo 类型
+        if not isinstance(info, ValidateFailInfo):
+            try:
+                info = ValidateFailInfo(*info)
+            except:
+                info = ValidateFailInfo(None, info)
+
     except (TypeError, ValueError):
+        # 否则，认为用户只返回了 ok，使用 SQL 查询结果作为默认的 info。
         ok = ret
-        info = ValidateFailInfo(
-            'default', 'validator is "{}", but result is {!r}'.format(job['validator'], results))
-    if not isinstance(info, ValidateFailInfo):
-        try:
-            info = ValidateFailInfo(*info)
-        except:
-            info = ValidateFailInfo(None, info)
+        info = ValidateFailInfo('default', results)
 
     return bool(ok), info
 
 
 def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interval=10):
+    """主程序，处理作业排队、分发、重试逻辑。
+    使用线程池以支持并行启动多个作业。
+    """
 
-    global task_queue
+    # 任务队列，使用优先队列，优先级为作业到期时间
+    task_queue = Queue.PriorityQueue()
 
     logger.info('checking job configs ...')
     for job in get_job_conf_list(db_config_file, job_config_files, job_names):
         logger.info('job [{}] config OK.'.format(job['_name']))
         task_queue.put_nowait((job['due_time'], job))
-    logger.info('all job configs OK.')
 
-    # for debugging ...
-        # run_job(job)
+    # # debug ...
+    #     run_job(job)
     # return
 
+    logger.info('all job configs OK.')
     logger.info('monitor start ...')
     logger.info('=' * 60)
     ntotal = task_queue.qsize()
     ncompleted = 0
     fs = {}
     logger.info('****** total jobs: {} ...'.format(ntotal))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=pool_size) as executor:
-        while not task_queue.empty() or fs:
-            logger.info(
-                '****** pending: {}, running: {}, completed: {} ...'
-                .format(task_queue.qsize(), len(fs), ncompleted))
 
-            # 如果任务队列非空，则轮询
+    with concurrent.futures.ThreadPoolExecutor(max_workers=pool_size) as executor:
+
+        # 主循环，退出条件为作业队列为空，且线程池中没有残留作业
+        while not task_queue.empty() or fs:
+            logger.info('****** pending: {}, running: {}, completed: {} ...'.format(task_queue.qsize(), len(fs), ncompleted))
+
+            # 如果任务队列非空，则轮询提取最近一个到期的作业，直到该作业到期
             if not task_queue.empty():
                 due_time, job = task_queue.queue[0]
                 now = datetime.datetime.now()
                 if now >= due_time:
                     _, job = task_queue.get()
                     future = executor.submit(run_job, job)
-                    logger.info('job [{}] is due. launched.'.format(job['_name']))
                     fs[future] = job
+                    logger.info('job [{}] is due. launched.'.format(job['_name']))
                 else:
                     time.sleep(poll_interval)
 
             # 收集并处理执行完成的 job
             try:
-                for future in concurrent.futures.as_completed(fs,
-                        timeout=poll_interval if task_queue.empty() else 0.1):
+                for future in concurrent.futures.as_completed(fs, timeout=poll_interval if task_queue.empty() else 0.1):
                     ncompleted += 1
                     job = fs.pop(future)
                     try:
                         ok, info_obj = future.result()
-                        msg = str(info_obj.content)
                     except Exception as e:
                         logger.error('job [{}] raised an exception:'.format(job['_name']))
                         logger.exception(e)
                         ok = False
                         info_obj = ValidateFailInfo('exception', traceback.format_exc())
-                        msg = 'job raised an exception: \n{}'.format(e)
 
                     # job 校验成功，打印日志，此 job 完成
                     if ok:
                         logger.info('job [{}] returned. status: OK.'.format(job['_name']))
                         continue
 
-                    # job 校验失败，发送报警，重试 job
-                    logger.info('job [{}] returned. status: =====> ALARM <=====. reason: {}'.format(job['_name'], msg))
-                    send_baidu_hi(job['alarm_hi'], msg)
-                    send_email(job['alarm_mail'], wrap_message(job, info_obj))
-                    if job['retry_times'] > 0:
-                        logger.info('job {!r} retrying. times left: {}.'.format(job['_name'], job['retry_times']))
-                        job['retry_times'] -= 1
-                        task_queue.put_nowait((datetime.datetime.now() + job['retry_interval'], job))
+                    # job 校验失败，发送报警，尝试重试 job
+                    baidu_hi_msg = format_baidu_hi(job, info_obj)
+                    indented_msg = '\t' + baidu_hi_msg.replace('\n', '\n\t')
+                    logger.info('job [{}] returned. status: =====> ALARM <=====\n{}'.format(job['_name'], indented_msg))
+                    send_baidu_hi(job['alarm_hi'], baidu_hi_msg)
+                    send_email(job['alarm_email'], format_email(job, info_obj))
 
+                    if job['retry_times'] > 0:
+                        job['retry_times'] -= 1
+                        logger.info('job [{}] retrying. times left: {}.'.format(job['_name'], job['retry_times']))
+                        task_queue.put_nowait((datetime.datetime.now() + job['retry_interval'], job))
 
             except concurrent.futures.TimeoutError:
                 pass
 
-        logger.info(
-            '****** pending: {}, running: {}, completed: {} ...'
-            .format(task_queue.qsize(), len(fs), ncompleted))
+        logger.info('****** pending: {}, running: {}, completed: {} ...'.format(task_queue.qsize(), len(fs), ncompleted))
         logger.info('all jobs ({}) finished.'.format(ntotal))
         logger.info('=' * 60)
         logger.info('monitor exit.')
 
 
 def execute(default_db_config_file, default_job_config_file):
+    """解析命令行参数并启动程序"""
 
     parser = argparse.ArgumentParser(
         description='data-monitor: monitor data of database and alarm when error occurs')
@@ -204,6 +217,5 @@ def execute(default_db_config_file, default_job_config_file):
         job_config_files = args.job_config_files
     else:
         job_config_files = [default_job_config_file]
-
 
     main(db_config_file, job_config_files, args.job_names)

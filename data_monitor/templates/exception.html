@@ -2,12 +2,20 @@
 <html>
 <head>
     <title></title>
+    <style type="text/css">
+        code: {{
+            font-family: Consolas,Menlo,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New,monospace,sans-serif;
+            background-color: #eff0f1;
+            white-space: pre-wrap;
+            font-size: 13px;
+            padding: 1px 5px;
+        }}
+    </style>
 </head>
 <body>
-    <h1>Job [{job_name}]</h1>
-    <p>due time {due_time}</p1>
-    <h2>This job has just raised an exception:</h2>
-    {content}
-    <!-- <textarea rows="30" cols="80" wrap="off" style="white-space: nowrap; overflow: scroll;">{content}</textarea> -->
+    <h1>job {job[_name]}</h1>
+    <p>due time {job[due_time]}</p1>
+    <h2>reason: job raised an exception</h2>
+    <code>{content}</code>
 </body>
 </html>

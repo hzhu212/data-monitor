@@ -3,10 +3,9 @@
 """
 @Author:      zhuhe02
 @Email:       zhuhe02@baidu.com
-@Description: 处理用户配置的工具包，该模块构建了一个配置层，使得配置文件的具体形态、格式
-              与主程序逻辑隔离。
-              如果将来想要切换配置形式，比如切换成 JSON 格式，只需要再实现对应的配置层
-              ，即实现 get_config_list 函数即可，主程序逻辑无需更改。
+@Description: 处理用户配置相关逻辑，该模块构建了一个配置层，使得配置文件的具体格式与主程序
+              逻辑隔离。以防将来需要切换配置格式，比如切换成 JSON，只需要再实现对应的
+              配置层（主要是 get_config_list 函数）即可，主程序逻辑无需更改。
 @CreateAt:    2019-03-31
 """
 
@@ -33,6 +32,8 @@ re_time = re.compile(r'^\d{1,2}:\d{1,2}(:\d{1,2})?$')
 class ConfigError(Exception): pass
 
 
+# 通用工具函数
+# ------------------------------------------------------------------------------
 def get_config(config_file, section_name=None):
     """load configuration file (.cfg/.ini).
     See "https://docs.python.org/2/library/configparser.html" for detail.
@@ -63,17 +64,15 @@ def detect_configs_conflict(config_files, key=None):
                 return conflicts.pop(), config_files[i], config_files[j]
 
 
-
+# 检查作业配置
+# ------------------------------------------------------------------------------
 def check_job_config(job_conf, db_configs):
-    """检查某个具体作业的配置。如果配置有误，将打印报错信息并跳过该作业。
-    如果作业配置了报警接收人，会将报错信息发送给接收人。
-    """
+    """检查某个具体作业的配置。如果配置有误，将打印报错信息并跳过该作业。"""
     try:
         return _check_job_config(job_conf, db_configs)
     except Exception as e:
         logger.exception(e)
-        # alarm
-
+        return None
 
 
 def _check_job_config(job_conf, db_configs):
@@ -81,11 +80,11 @@ def _check_job_config(job_conf, db_configs):
 
     # 检查必选配置项
     REQUIRED_OPTIONS = (
-        'period', 'is_active', 'alarm_hi', 'alarm_mail', 'due_time', 'db_conf',
+        'period', 'is_active', 'alarm_hi', 'alarm_email', 'due_time', 'db_conf',
         'sql', 'validator', )
     for op in REQUIRED_OPTIONS:
         if op not in job_conf:
-            raise ConfigError('[Job name {}]: option "{}" is required'.format(job_conf['_name'], op))
+            raise ConfigError('job [{}]: option "{}" is required'.format(job_conf['_name'], op))
 
     # 检查枚举类型配置项
     enums = {
@@ -95,7 +94,7 @@ def _check_job_config(job_conf, db_configs):
     for k, scope in enums.items():
         if job_conf[k] not in scope:
             raise ConfigError(
-                '[Job name {}]: option "{}" should be in "{}"'
+                'job [{}]: option "{}" should be in "{}"'
                 .format(job_conf['_name'], k, list(scope)))
 
 
@@ -103,7 +102,7 @@ def _check_job_config(job_conf, db_configs):
     for k, v in job_conf.items():
         if 'DUETIME' in v and k != 'sql':
             raise ConfigError(
-                '[Job name {}]: environment variable "DUETIME" can only be used '
+                'job [{}]: environment variable "DUETIME" can only be used '
                 'in option "sql"'.format(job_conf['_name']))
 
 
@@ -112,7 +111,7 @@ def _check_job_config(job_conf, db_configs):
         job_conf['retry_times'] = int(job_conf['retry_times'])
     except ValueError as e:
         raise ConfigError(
-            '[Job name {}]: option "retry_times" should be an integer, but {!r} '
+            'job [{}]: option "retry_times" should be an integer, but {!r} '
             'got'.format(job_conf['_name'], job_conf['retry_times']))
 
 
@@ -120,7 +119,7 @@ def _check_job_config(job_conf, db_configs):
     m = re_time.match(job_conf['retry_interval'])
     if not m:
         raise ConfigError(
-            '[Job name {}]: option "retry_interval" should be in format of "HH:MM[:SS]"'
+            'job [{}]: option "retry_interval" should be in format of "HH:MM[:SS]"'
             .format(job_conf['_name']))
 
     # retry_interval 应能被解析成 datetime.timedelta
@@ -130,9 +129,8 @@ def _check_job_config(job_conf, db_configs):
             hours=parsed.hour, minutes=parsed.minute, seconds=parsed.second)
     except ValueError as e:
         raise ConfigError(
-            '[Job name {}]: can not parse retry_interval("{}") into datetime.timedelta'
+            'job [{}]: can not parse retry_interval("{}") into datetime.timedelta'
             .format(job_conf['_name'], job_conf['retry_interval']))
-
 
     # 将 db_conf, database, sql 分别处理成列表，并保证三者的长度等长（database 可为空）
     job_conf['db_conf'] = [s.strip() for s in job_conf['db_conf'].split(',') if s.strip()]
@@ -142,11 +140,11 @@ def _check_job_config(job_conf, db_configs):
     len1, len2, len3 = len(job_conf['db_conf']), len(job_conf['database']), len(job_conf['sql'])
     if len2 != 0 and len2 != len1:
         raise ConfigError(
-            '[Job name {}]: "db_conf" contains {} elements but "database" contains {}'
+            'job [{}]: "db_conf" contains {} elements but "database" contains {}'
             .format(job_conf['_name'], len1, len2))
     if len1 != len3:
         raise ConfigError(
-            '[Job name {}]: "db_conf" contains {} elements but "sql" contains {}'
+            'job [{}]: "db_conf" contains {} elements but "sql" contains {}'
             .format(job_conf['_name'], len1, len3))
 
     # 检查 db_conf 是否合法
@@ -171,7 +169,7 @@ def _check_job_config(job_conf, db_configs):
     except (SyntaxError, NameError) as e:
         tb = traceback.format_exc()
         raise ConfigError(
-            '[Job name {}]: error in option "validator", traceback is: \n{}'
+            'job [{}]: error in option "validator", traceback is: \n{}'
             .format(job_conf['_name'], tb))
     except:
         pass
@@ -180,7 +178,7 @@ def _check_job_config(job_conf, db_configs):
     job_conf['is_active'] = True if job_conf['is_active'] == 'true' else False
     job_conf['due_time'] = dateparser.parse(job_conf['due_time'])
     job_conf['alarm_hi'] = [s for s in job_conf['alarm_hi'].split(',')]
-    job_conf['alarm_mail'] = [s for s in job_conf['alarm_mail'].split(',')]
+    job_conf['alarm_email'] = [s for s in job_conf['alarm_email'].split(',')]
 
     # 从 db_configs 中取出对应的 db_conf 替换 db_conf 字段
     for i, name in enumerate(job_conf['db_conf']):
@@ -191,17 +189,16 @@ def _check_job_config(job_conf, db_configs):
     return job_conf
 
 
-
-
-# 有些模板变量依赖其他选项，必须等其他选项渲染完成后才能渲染
-DEPENDING_VARS = ('DUETIME', )
-
+# 渲染配置
+# ------------------------------------------------------------------------------
 # 创建默认的 jinja2 Environment，使用 '{}' 标识变量渲染块
 env = jinja2.Environment(
     variable_start_string='{',
     variable_end_string='}',)
 env.filters = get_filter_context()
 
+# 有些模板变量依赖其他选项，必须等其他选项渲染完成后才能渲染
+DEPENDING_VARS = ('DUETIME', )
 
 def _escape_vars(s, variables):
     """转义指定的一些变量，使其暂时不必渲染。
@@ -212,7 +209,6 @@ def _escape_vars(s, variables):
     t = '|'.join(variables)
     return re.sub(r'{([^{}]*?(%s)[^{}]*?)}' % t, '\x01' + r'\1' + '\x02', s)
 
-
 def _unescape_vars(s, variables):
     """_escape_vars 的逆操作"""
     # if isinstance(variables, basestring):
@@ -220,7 +216,6 @@ def _unescape_vars(s, variables):
     # t = '|'.join(variables)
     # return re.sub(r'<<<(.*?(%s).*?)>>>' % t, r'{\1}', s)
     return s.replace('\x01', '{').replace('\x02', '}')
-
 
 def render_job_conf(job_conf):
     """载入时渲染"""
@@ -239,7 +234,6 @@ def render_job_conf(job_conf):
             job_conf[k] = _unescape_vars(v, DEPENDING_VARS)
 
     return job_conf
-
 
 def render_depending_job_conf(job_conf):
     """有一些选项依赖其他选项，必须等其他选项渲染之后才能渲染。
@@ -260,8 +254,8 @@ def render_depending_job_conf(job_conf):
     return job_conf
 
 
-
-
+# 主函数，载入、处理所有配置并返回给主程序
+# ------------------------------------------------------------------------------
 def get_job_conf_list(db_config_file, job_config_files, job_names):
     """检查、清洗和渲染作业配置。
     返回一个处理好的作业配置序列，其中的每个作业配置可用于生成和运行作业。
@@ -305,8 +299,10 @@ def get_job_conf_list(db_config_file, job_config_files, job_names):
         # 渲染配置项
         job_conf = render_job_conf(job_conf)
 
-        # 检查作业配置，如果有误将发出报警并跳过作业
+        # 检查作业配置，如果有误将打印错误并跳过该作业
         job_conf = check_job_config(job_conf, db_configs)
+        if job_conf is None:
+            continue
 
         # 跳过非活跃作业
         if not job_conf['is_active']:
