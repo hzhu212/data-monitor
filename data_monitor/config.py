@@ -13,6 +13,7 @@
 import datetime
 from dateutil import parser as dateparser
 import logging
+import os
 import re
 import traceback
 try:
@@ -40,7 +41,10 @@ def get_config(config_file, section_name=None):
     if section_name is None, return the whole config file as ConfigParser object;
     if section_name is given, return the section config as a dict.
     """
+    # 默认情况下，配置文件中的 key 是不分大小写的（为了兼容 Windows），此处设为区分大小写
     conf = configparser.ConfigParser()
+    conf.optionxform = str
+
     conf.read(config_file)
     if section_name is None:
         return {name: dict(conf.items(name)) for name in conf.sections()}
@@ -134,7 +138,10 @@ def _check_job_config(job_conf, db_configs):
 
     # 将 db_conf, database, sql 分别处理成列表，并保证三者的长度等长（database 可为空）
     job_conf['db_conf'] = [s.strip() for s in job_conf['db_conf'].split(',') if s.strip()]
-    job_conf['database'] = [s.strip() for s in job_conf['database'].split(',') if s.strip()]
+    if 'database' in job_conf and job_conf['database']:
+        job_conf['database'] = [s.strip() for s in job_conf['database'].split(',') if s.strip()]
+    else:
+        job_conf['database'] = [None] * len(job_conf['db_conf'])
     job_conf['sql'] = [s.strip() for s in job_conf['sql'].split('::') if s.strip()]
 
     len1, len2, len3 = len(job_conf['db_conf']), len(job_conf['database']), len(job_conf['sql'])
@@ -153,13 +160,15 @@ def _check_job_config(job_conf, db_configs):
             raise ConfigError('Invalid db_conf {!r}, should be in {!r}'.format(
                 job_conf['db_conf'], db_configs.keys()))
 
-    # 如果 sql 选项是文件路径，那么从文件中读取 sql 内容
+    # 如果 sql 选项是文件路径，那么从文件中读取 sql 内容，支持绝对路径与相对路径
     for i, s in enumerate(job_conf['sql']):
-        if s.startswith('/') or s.startswith('~/') or s[-4:].lower() in ('.sql', '.hql'):
+        if s.startswith('/') or s.startswith('~/') or s.startswith('.') or s[-4:].lower() in ('.sql', '.hql'):
             if not os.path.isfile(s):
                 raise ConfigError('sql file not exists: {!r}'.format(s))
             with open(s, 'r') as f:
-                job_conf['sql'][i] = f.read()
+                # 文件中的 %(name)s 因为脱离了 cfg 文件，不会被自动替换，此处需手动置换
+                sql = f.read()
+                job_conf['sql'][i] = sql % job_conf
 
     # 检查 validator 是否有语法错误，以及是否调用了不存在的变量
     from context import get_validator_context
@@ -183,7 +192,7 @@ def _check_job_config(job_conf, db_configs):
     # 从 db_configs 中取出对应的 db_conf 替换 db_conf 字段
     for i, name in enumerate(job_conf['db_conf']):
         job_conf['db_conf'][i] = db_configs[name]
-        if job_conf['database']:
+        if job_conf['database'][i]:
             job_conf['db_conf'][i]['database'] = job_conf['database'][i]
 
     return job_conf
@@ -211,10 +220,6 @@ def _escape_vars(s, variables):
 
 def _unescape_vars(s, variables):
     """_escape_vars 的逆操作"""
-    # if isinstance(variables, basestring):
-    #     variables = [variables]
-    # t = '|'.join(variables)
-    # return re.sub(r'<<<(.*?(%s).*?)>>>' % t, r'{\1}', s)
     return s.replace('\x01', '{').replace('\x02', '}')
 
 def render_job_conf(job_conf):

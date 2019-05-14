@@ -18,10 +18,14 @@ def naive_check(result):
 
 
 @register_validator
-def diff(result, threshold=1e-6):
+def diff(result, threshold=1e-6, direction=0):
     """diff 两组数据。
-    每组数据可包含多列，程序会假定最后一列为 value，前面所有列为 key
+    每组数据可包含多列，程序会假定最后一列为 value，前面所有列为 key。
+    threshold 为警报阈值：diff 列中任意一值超过 threshold 即触发报警（一边为 NULL 值同样触发报警）
+    direction 为 diff 的方向：-1 代表左表减右表，1 代表右表减左表，0 代表两表之差取绝对值。默认为 0。
     """
+    if direction not in (-1, 0, 1):
+        raise ValueError('invalid argument "direction={!r}", should be one value in [-1, 0, 1]'.format(direction))
     if len(result) != 2:
         raise ValueError('parameter of function `diff` should be a 2-tuple')
     data1, data2 = result
@@ -63,7 +67,8 @@ def diff(result, threshold=1e-6):
     col1, col2 = df_all.columns.tolist()[-2:]
     try:
         diff = df_all[col1] - df_all[col2]
-        index = (abs(diff) > threshold) | diff.isna()
+        diff = abs(diff) if direction == 0 else diff if direction == -1 else -diff
+        index = (diff > threshold) | diff.isna()
     except:
         diff = None
         index = df_all[col1] != df_all[col2]

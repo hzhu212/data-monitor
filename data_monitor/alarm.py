@@ -41,6 +41,7 @@ def format_baidu_hi(job, info):
             content_s = str(content)
         msg += [
             'reason: find diff',
+            'validator is: `{}`'.format(job['validator'].encode('utf8')),
             '-' * 20,
             content_s,]
 
@@ -56,8 +57,8 @@ def format_baidu_hi(job, info):
         msg += [
             'reason: validator not pass',
             '-' * 20,
-            'validator is: ' + job['validator'].encode('utf8'),
-            'result is: ' + repr(content), ]
+            'validator is: `{}`'.format(job['validator'].encode('utf8')),
+            'with `result` as: `{}`'.format(repr(content)),]
 
     msg = '\n'.join(msg)
     return msg
@@ -87,7 +88,6 @@ def format_email(job, info):
 
     else:
         template_file = os.path.join(template_dir, 'default.html')
-        content = str(content)
 
     with open(template_file, 'r') as f:
         msg = f.read().format(
