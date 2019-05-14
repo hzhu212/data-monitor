@@ -258,7 +258,7 @@ optional arguments:
                         time of job.
 ```
 
-程序开始执行后，会在控制台中打印详细的执行日志，覆盖作业调度、是否报警、异常等各种信息。以下为某次启动 data-monitor 之后的运行日志：
+程序开始执行后，会在控制台中打印详细的执行日志，覆盖作业调度、是否报警、异常等各种信息。以下为某次启动 data-monitor 之后的执行日志：
 
 ```
 [2019-05-14 18:28:36,295] data_monitor INFO: checking job configs ...
@@ -298,7 +298,7 @@ optional arguments:
 
 ## 5. 更多配置示例
 
-单值 diff：
+**单值 diff**：
 
 ```ini
 [demo_simple_diff]
@@ -328,7 +328,7 @@ with `result` as: `[48L, 48L]`
 
 ---
 
-两表 diff：
+**两表 diff**：
 
 ```ini
 [demo_two_table_diff]
@@ -351,7 +351,7 @@ alarm_email = zhuhe02
 
 这个示例的 `validator` 使用了自定义校验函数 `diff`，该函数定义在 `data_monitor/user/validators.py` 中。用户可以仿照该函数定义自己的校验函数。
 
-其中，`diff(result[0], result[1], threshold=1)` 的含义为对 `result[0]` 和 `result[1]` 做 diff，如果 diff 的绝对值超过 1，则发出警报。警报信息中会提供所有不满足 diff 要求的行，帮助定位问题，类似于下面这样：
+其中，`diff(result[0], result[1], threshold=1)` 的含义为对 `result[0]` 和 `result[1]` 做 diff，如果 diff 的绝对值超过 `threshold`，则发出警报。警报信息中会给出所有不满足条件的行，帮助定位问题，示例如下：
 
 ```
 job: demo_two_table_diff
@@ -382,4 +382,4 @@ validator is: `diff(result[0], result[1], threshold=1)`
 
 ---
 
-小时级数据监控：
+**小时级数据监控**：
