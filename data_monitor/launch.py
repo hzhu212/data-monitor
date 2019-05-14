@@ -184,25 +184,22 @@ def execute(default_db_config_file, default_job_config_file):
     """解析命令行参数并启动程序"""
 
     parser = argparse.ArgumentParser(
-        description='data-monitor: monitor data of database and alarm when error occurs')
+        description='data-monitor: monitor databases and alarm when data is not as expected')
     parser.add_argument(
         '-c', '--config-file', dest='job_config_files', action='append',
-        help='path of job config file, if not provided, use default config file. '
+        help='path of job config file, if not provided, use `job.cfg` under current path. '
             'you can provide multiple config files by repeating `-c` option, '
-            'job name conflicts will be auto-detected.')
+            'conflicted job names will be auto-detected.')
     parser.add_argument(
         '--db-config-file', dest='db_config_file',
-        help='path of database config file, if not provided, use default config file.')
+        help='path of database config file, if not provided, use `database.cfg` under current path.')
     parser.add_argument(
-        '-j', '--job', dest='job_names', action='append',
+        '-j', '--job', dest='job_names', action='append', default=[],
         help='job name (section name in your job config file). you can launch '
             'multiple jobs by repeating `-j` option.')
     parser.add_argument(
-        '-f', '--force', dest='force_run', action='store_true',
-        help='force to run all jobs, including inactive ones.')
-    parser.add_argument(
-        '--check', dest='run_check',  action='store_true',
-        help='check job config(run job immediately, don\'t wait until job `start_at`.)')
+        '--force', dest='force', action='store_true',
+        help='force to run job(s) immediately, do not wait until due time of job.')
 
     args = parser.parse_args()
 
@@ -221,5 +218,10 @@ def execute(default_db_config_file, default_job_config_file):
         job_config_files = args.job_config_files
     else:
         job_config_files = [default_job_config_file]
+
+    if args.force and not args.job_names:
+        raise ValueError(
+            'job name(s) has to be provided when using `force` mode, otherwise '
+            'you may annoy other users by sending a lot of alarm messages!')
 
     main(db_config_file, job_config_files, args.job_names)
