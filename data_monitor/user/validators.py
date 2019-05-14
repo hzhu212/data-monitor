@@ -18,7 +18,7 @@ def naive_check(result):
 
 
 @register_validator
-def diff(result, threshold=1e-6, direction=0):
+def diff(data1, data2, threshold=1e-6, direction=0):
     """diff 两组数据。
     每组数据可包含多列，程序会假定最后一列为 value，前面所有列为 key。
     threshold 为警报阈值：diff 列中任意一值超过 threshold 即触发报警（一边为 NULL 值同样触发报警）
@@ -26,14 +26,11 @@ def diff(result, threshold=1e-6, direction=0):
     """
     if direction not in (-1, 0, 1):
         raise ValueError('invalid argument "direction={!r}", should be one value in [-1, 0, 1]'.format(direction))
-    if len(result) != 2:
-        raise ValueError('parameter of function `diff` should be a 2-tuple')
-    data1, data2 = result
 
     if len(data1) == 0:
-        return False, 'result[0] (the first table) is empty'
+        return False, 'data1 (the first table) is empty'
     if len(data2) == 0:
-        return False, 'result[1] (the second table) is empty'
+        return False, 'data2 (the second table) is empty'
 
     def get_fields(data):
         """尝试获取 data(SQL 查询结果) 的字段列表"""
