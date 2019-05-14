@@ -94,7 +94,7 @@ def run_job(job):
     return bool(ok), info
 
 
-def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interval=10):
+def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interval=5):
     """主程序，处理作业排队、分发、重试逻辑。
     使用线程池以支持并行启动多个作业。
     """
@@ -135,7 +135,11 @@ def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interva
                     fs[future] = job
                     logger.info('job [{}] is due. launched.'.format(job['_name']))
                 else:
-                    time.sleep(poll_interval)
+                    sleep_time = poll_interval
+                    if len(fs) == 0:
+                        sleep_time = (due_time - now).total_seconds()
+                        logger.info('sleeping until the most recent job [{}] due ({}) ...'.format(job['_name'], due_time))
+                    time.sleep(sleep_time)
 
             # 收集并处理执行完成的 job
             try:
