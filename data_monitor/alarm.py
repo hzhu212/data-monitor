@@ -36,7 +36,7 @@ def format_baidu_hi(job, info):
     if type_ == 'diff':
         # diff 类型对应的 content 为 pandas.DataFrame
         try:
-            content_s = content.to_string(max_rows=20).encode('utf8')
+            content_s = content.to_string(max_rows=10).encode('utf8')
         except:
             content_s = str(content)
         msg += [
@@ -83,16 +83,21 @@ def format_email(job, info):
 
     elif type_ == 'exception':
         template_file = os.path.join(template_dir, 'exception.html')
-        content = content.replace(' ', '&nbsp;').replace('\n', '</p><p>')
+        content = content.replace('\t', ' '*4).replace(' ', '&nbsp;').replace('\n', '</p><p>')
         content = '<p>' + content + '</p>'
 
     else:
         template_file = os.path.join(template_dir, 'default.html')
 
+    htmled_sql = '<hr/>'.join('<p>' + s.replace('\n', '</p><p>') + '</p>' for s in job['sql'])
+    # htmled_sql = htmled_sql.replace('<p>', '<p style="margin: 0 5px">')
     with open(template_file, 'r') as f:
         msg = f.read().format(
             job=dict(job, validator=job['validator'].encode('utf8')),
-            content=content)
+            content=content,
+            sql=htmled_sql,
+            database=', '.join(db['_name'] for db in job['db_conf'])
+            )
 
     return msg
 

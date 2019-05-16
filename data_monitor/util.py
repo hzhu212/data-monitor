@@ -12,3 +12,5 @@ from collections import namedtuple
 
 
 ValidateFailInfo = namedtuple('ValidateFailInfo', ['type', 'content'])
+
+class ValidatorError(ValueError): pass

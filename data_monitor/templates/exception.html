@@ -2,11 +2,26 @@
 <html>
 <head>
     <title></title>
+    <style type="text/css">
+        code, .code {{
+            color: #7D2727;
+            background-color: #eff0f1;
+            }}
+        code p, .code p {{
+            margin: 0 5px;
+            }}
+    </style>
 </head>
 <body>
     <h1>job {job[_name]}</h1>
     <p>due time {job[due_time]}</p1>
+    <hr/>
+
     <h2>reason: job raised an exception</h2>
     <code>{content}</code>
+    <hr/>
+
+    <p><b>sql</b> is: <div class="code" style="margin-left: 2em"><code>{sql}</code></div></p>
+    <p>with <code>db_conf</code>(s) as: <code>{database}</code></p>
 </body>
 </html>

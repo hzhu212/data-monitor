@@ -2,12 +2,26 @@
 <html>
 <head>
     <title></title>
+    <style type="text/css">
+        code, .code {{
+            color: #7D2727;
+            background-color: #eff0f1;
+            }}
+        code p, .code p {{
+            margin: 0 5px;
+            }}
+    </style>
 </head>
 <body>
     <h1>job {job[_name]}</h1>
     <p>due time {job[due_time]}</p1>
+    <hr/>
+
     <h2>reason: validator not pass</h2>
-    <p>validator is: <code>{job[validator]}</code></p>
-    <p>with <code>result</code> as <code>{content!r}</code></p>
+    <p><b>validator</b> is: <code>{job[validator]}</code></p>
+    <p>with <code>result</code> as: <code>{content!r}</code></p>
+
+    <p><b>sql</b> is: <div class="code" style="margin-left: 2em"><code>{sql}</code></div></p>
+    <p>with <code>db_conf</code>(s) as: <code>{database}</code></p>
 </body>
 </html>

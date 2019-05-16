@@ -20,7 +20,7 @@ from .alarm import format_baidu_hi, send_baidu_hi, format_email, send_email
 from .config import get_job_conf_list
 from .context import get_validator_context
 from .db import get_connection
-from .util import ValidateFailInfo
+from .util import ValidateFailInfo, ValidatorError
 
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(name)s %(levelname)s: %(message)s')
@@ -73,7 +73,10 @@ def run_job(job):
 
     context = get_validator_context()
     context.update({'result': results})
-    ret = eval(job['validator'], {'__builtins__': {}}, context)
+    try:
+        ret = eval(job['validator'], {'__builtins__': {}}, context)
+    except Exception as e:
+        raise ValidatorError('your validator {!r} raised an exception: \n\t{!r}'.format(job['validator'], e))
 
     try:
         # 如果用户 validator 中同时返回了 ok 和 info，则直接使用
