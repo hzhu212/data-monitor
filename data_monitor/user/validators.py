@@ -7,6 +7,8 @@
 @CreateAt:    2019-03-31
 """
 
+from functools import partial
+import operator
 
 from ..context import register_validator
 from ..util import AlarmInfo
@@ -15,6 +17,41 @@ from ..util import AlarmInfo
 @register_validator
 def naive_check(result):
     return result > 0
+
+
+@register_validator
+def claim(data, pred):
+    """断言一组数据。
+    数据可包含多列，程序会假定最后一列为 value，前面所有列为 key。
+    pred（谓词）参数必须是一个函数，已定义好的函数包括 gt, ge, lt, le, eq, ne。
+    谓词判断失败会触发报警，且报警信息中会给出所有判断失败的行。
+    """
+    # 如果 data 是单个值，直接判定
+    if not isinstance(data, (tuple, list)):
+        ok = pred(data)
+        return ok
+
+    if len(data) == 0:
+        return False, 'result is empty'
+
+    def get_fields(data):
+        """尝试获取 data(SQL 查询结果) 的字段列表"""
+        try:
+            return data[0]._fields
+        except AttributeError:
+            return ['col' + str(i) for i in range(len(data[0]))]
+
+    col_names = get_fields(data)
+
+    import pandas as pd
+    df = pd.DataFrame(data, columns=col_names)
+    index = df[col_names[-1]].apply(pred)
+    res = df.loc[~index, :]
+    if len(res.index) == 0:
+        return True
+
+    res.reset_index(inplace=True, drop=True)
+    return False, AlarmInfo('claim', res)
 
 
 @register_validator
@@ -79,3 +116,50 @@ def diff(data1, data2, threshold=1e-6, direction=0):
     res.reset_index(inplace=True, drop=True)
     info = AlarmInfo('diff', res)
     return False, info
+
+
+# 注册一些基本的谓词函数（predicate function），如大于、小于等，以便用户在校验表达式中使用。
+@register_validator
+def gt(b):
+    meth = lambda a, b: operator.gt(a, b)
+    return partial(meth, b=b)
+
+@register_validator
+def ge(b):
+    meth = lambda a, b: operator.ge(a, b)
+    return partial(meth, b=b)
+
+@register_validator
+def lt(b):
+    meth = lambda a, b: operator.lt(a, b)
+    return partial(meth, b=b)
+
+@register_validator
+def le(b):
+    meth = lambda a, b: operator.le(a, b)
+    return partial(meth, b=b)
+
+@register_validator
+def eq(b):
+    meth = lambda a, b: operator.eq(a, b)
+    return partial(meth, b=b)
+
+@register_validator
+def ne(b):
+    meth = lambda a, b: operator.ne(a, b)
+    return partial(meth, b=b)
+
+# 支持多谓词组合
+@register_validator
+def ands(*args):
+    """把多个谓词取且，得到一个联合谓词"""
+    def combined_fun(x):
+        return all(pred(x) for pred in args)
+    return combined_fun
+
+@register_validator
+def ors(*args):
+    """把多个谓词取或，得到一个联合谓词"""
+    def combined_fun(x):
+        return any(pred(x) for pred in args)
+    return combined_fun

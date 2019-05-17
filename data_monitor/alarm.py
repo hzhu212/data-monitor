@@ -43,7 +43,19 @@ def format_baidu_hi(job, info):
         'due time: {}'.format(job['due_time']),
         '=' * 20, ]
 
-    if type_ == 'diff':
+    if type_ == 'claim':
+        # claim 类型对应的 content 为 pandas.DataFrame
+        try:
+            content_s = content.to_string(max_rows=10).encode('utf8')
+        except:
+            content_s = str(content)
+        msg += [
+            'reason: claim failed for some records',
+            'validator is: `{}`'.format(job['validator'].encode('utf8')),
+            '-' * 20,
+            content_s,]
+
+    elif type_ == 'diff':
         # diff 类型对应的 content 为 pandas.DataFrame
         try:
             content_s = content.to_string(max_rows=10).encode('utf8')
@@ -92,7 +104,14 @@ def format_email(job, info):
             msg = f.read().format(job=job, content=content)
             return msg
 
-    if type_ == 'diff':
+    if type_ == 'claim':
+        template_file = os.path.join(template_dir, 'claim.html')
+        try:
+            content = content.to_html().encode('utf8')
+        except AttributeError:
+            content = str(content)
+
+    elif type_ == 'diff':
         template_file = os.path.join(template_dir, 'diff.html')
         try:
             content = content.to_html().encode('utf8')
