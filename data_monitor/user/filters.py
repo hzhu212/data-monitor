@@ -9,7 +9,7 @@
 
 
 import datetime
-from dateutil import parser as dateparser
+from dateutil import parser as dateparser, relativedelta
 
 from ..context import register_filter
 
@@ -28,7 +28,7 @@ def dt_add(dt, **kwargs):
             params[key+'s'] = value
         else:
             params[key] = value
-    return dt + datetime.timedelta(**params)
+    return dt + relativedelta.relativedelta(**params)
 
 
 @register_filter
@@ -41,8 +41,9 @@ def dt_set(dt, **kwargs):
 
     # 补丁，用于支持 weekday 参数
     if 'weekday' in kwargs:
-        if 'day' in kwargs:
-            raise ValueError('conflict arguments, can not set "day" and "weekday" at one time')
+        for conflict_name in ('year', 'month', 'day'):
+            if conflict_name in kwargs:
+                raise ValueError('dt_set conflict, can not set "{}" and "weekday" at one time'.format(conflict_name))
         if kwargs['weekday'] not in range(1, 8):
             raise ValueError('argument "weekday" should be an integer between 1~7')
         # datetime 默认的 weekday 范围为 0~6，分别代表周一到周日
