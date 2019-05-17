@@ -33,9 +33,21 @@ def dt_add(dt, **kwargs):
 
 @register_filter
 def dt_set(dt, **kwargs):
-    """重设 datetime 中的某个字段，如 dt_set(dt, day=1, hour=9)"""
+    """重设 datetime 中的某个字段，如 dt_set(dt, day=1, hour=9)。
+    除年月日时分秒等常规参数之外，还支持 weekday 参数，使用 1~7 分别代表周一到周日。
+    """
     if not isinstance(dt, datetime.date):
         dt = dateparser.parse(dt)
+
+    # 补丁，用于支持 weekday 参数
+    if 'weekday' in kwargs:
+        if 'day' in kwargs:
+            raise ValueError('conflict arguments, can not set "day" and "weekday" at one time')
+        if kwargs['weekday'] not in range(1, 8):
+            raise ValueError('argument "weekday" should be an integer between 1~7')
+        # datetime 默认的 weekday 范围为 0~6，分别代表周一到周日
+        weekday = kwargs.pop('weekday') - 1
+        dt += datetime.timedelta(days=weekday - dt.weekday())
 
     return dt.replace(**kwargs)
 
