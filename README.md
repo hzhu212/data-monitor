@@ -201,7 +201,6 @@ with `result` as: `38L`
 
 ```sh
 python main.py --job demo_simple_value
-
 # 或者
 # python main.py -j demo_simple_value
 ```
@@ -222,7 +221,6 @@ python main.py
 
 ```sh
 python main.py --config-file /path/to/job_config_file.cfg
-
 # 或者
 # python main.py -c /path/to/job_config_file.cfg
 ```
@@ -298,10 +296,95 @@ optional arguments:
 
 ## 5. 更多配置示例
 
-**单值 diff**：
+### 单值监控
 
 ```ini
-[demo_simple_diff]
+[demo_single_value]
+due_time = {BASETIME | dt_set(hour=9)}
+db_conf = palo_muse
+sql =
+    SELECT count(1)
+    FROM pmc_all_channel_advertising
+    WHERE event_day = '%(YESTERDAY)s'
+validator = result > 50
+alarm_hi = zhuhe02_02
+alarm_email = zhuhe02
+```
+
+如果校验失败，将发出类似下面的警报：
+
+```
+job: demo_single_value
+due time: 2019-05-17 09:00:00
+====================
+reason: validator not pass
+--------------------
+validator is: `result > 50`
+with `result` as: `47L`
+```
+
+### 单表监控
+
+```ini
+[demo_single_table]
+due_time = {BASETIME | dt_set(hour=9)}
+db_conf = palo_muse
+sql =
+    SELECT event_day, count(1)
+    FROM pmc_all_channel_advertising
+    WHERE event_day >= '{BASETIME | dt_add(months=-1)}'
+    GROUP BY event_day
+    ORDER BY event_day
+validator = claim(result, gt(50))
+alarm_hi = zhuhe02_02
+alarm_email = zhuhe02
+```
+
+该示例的 `validator` 中使用了自定义校验函数 `claim` 和 `gt`，这些函数定义在 `data_monitor/user/validators.py` 中。其中：
+
+- `claim` 函数用于断言一个 SQL 查询结果集。接收两个参数，参数一为查询结果集，参数二是一个“谓词函数”，接收一个单值并返回一个布尔值。
+- `gt(50)` 是一个谓词函数，用于判定一个值是否“大于50”。类似的谓词还有 `ge`、`lt`、`le`、`eq`、`ne`，分别用于判定大于等于、小于、小于等于、等于、不等于。
+- 整个 validator 表达式的含义就是：判断查询结果集的 value 列（最后一列）的数据是否都大于50，如果有任意一个不大于50，则触发警报。警报中会给出所有不大于50的行。
+
+如果校验失败，将发出类似下面的警报：
+
+```
+job: demo_single_table
+due time: 2019-05-17 09:00:00
+====================
+reason: claim failed for some records
+validator is: `claim(result, gt(50))`
+--------------------
+     event_day  col1
+0   2019-04-23    49
+1   2019-04-24    49
+2   2019-04-25    48
+3   2019-04-26    49
+4   2019-04-27    45
+..         ...   ...
+19  2019-05-12    49
+20  2019-05-13    48
+21  2019-05-14    47
+22  2019-05-15    39
+23  2019-05-16    47
+```
+
+#### 谓词函数的组合
+
+谓词函数可以通过 `ands`（且）、`ors`（或）两个高阶谓词函数进行自由组合（包括嵌套组合），这两个函数同样定义在 `data_monitor/user/validators.py` 中。使用示例如下：
+
+```ini
+; 大于 50 且小于 60 且不等于 55
+validator = claim(result, ands(gt(50), lt(60), ne(55)))
+
+; 大于 50 且小于 60 且不等于 55，或等于 0
+validator = claim(result, ors(ands(gt(50), lt(60), ne(55)), eq(0)))
+```
+
+### 单值 diff
+
+```ini
+[demo_diff_value]
 due_time = {BASETIME | dt_set(hour=9)}
 db_conf = palo_muse, palo_muse_new
 _sql =
@@ -314,7 +397,7 @@ alarm_hi = zhuhe02_02
 alarm_email = zhuhe02
 ```
 
-如果校验失败，将发出类似下面的警报（这个警报是我刻意制造的）：
+如果校验失败，将发出类似下面的警报：
 
 ```
 job: demo_simple_diff
@@ -322,36 +405,34 @@ due time: 2019-05-14 09:00:00
 ====================
 reason: validator not pass
 --------------------
-validator is: `abs(result[0] - result[1]) < 0`
-with `result` as: `[48L, 48L]`
+validator is: `abs(result[0] - result[1]) < 1`
+with `result` as: `[47L, 48L]`
 ```
 
----
-
-**两表 diff**：
+### 两表 diff
 
 ```ini
-[demo_two_table_diff]
+[demo_diff_table]
 due_time = {BASETIME | dt_set(hour=9)}
 db_conf = palo_muse, palo_muse_new
 sql =
-    SELECT product, partner, sum(click) AS num
+    SELECT event_day, product, partner, sum(click) AS num
     FROM pmc_all_channel_advertising
     WHERE event_day = '%(YESTERDAY)s'
-    GROUP BY product, partner
+    GROUP BY event_day, product, partner
     ::
-    SELECT product, partner, sum(click) AS num
+    SELECT event_day, product, partner, sum(click) AS num
     FROM pmc_all_channel_advertising
     WHERE event_day = '%(YESTERDAY)s'
-    GROUP BY product, partner
+    GROUP BY event_day, product, partner
 validator = diff(result[0], result[1], threshold=1)
 alarm_hi = zhuhe02_02
 alarm_email = zhuhe02
 ```
 
-这个示例的 `validator` 使用了自定义校验函数 `diff`，该函数定义在 `data_monitor/user/validators.py` 中。用户可以仿照该函数定义自己的校验函数。
+该示例的 `validator` 中使用了自定义校验函数 `diff`，该函数定义在 `data_monitor/user/validators.py` 中。
 
-其中，`diff(result[0], result[1], threshold=1)` 的含义为对 `result[0]` 和 `result[1]` 做 diff，如果 diff 的绝对值超过 `threshold`，则发出警报。警报信息中会给出所有不满足条件的行，帮助定位问题，示例如下：
+其中，`diff(result[0], result[1], threshold=1)` 的含义是对 `result[0]` 和 `result[1]` 做 diff，如果 diff 的绝对值超过 `threshold`，则发出警报。警报信息中会给出所有不满足条件的行，示例如下：
 
 ```
 job: demo_two_table_diff
@@ -380,6 +461,12 @@ validator is: `diff(result[0], result[1], threshold=1)`
 16       baiduboxapp          meizu    14744   12701    2043
 ```
 
----
+`diff` 函数还可以接受一个额外的参数 `direction` 用于指定 diff 的方向，其取值为 `-1`、`0`、`1`，分别代表左表减右表、两表相减取绝对值、右表减左表，默认值为 `0`。
 
-**小时级数据监控**：
+### 小时级数据监控
+
+小时级任务比起其他任务有些特殊，主要体现在以下几个方面：
+
+- 需要在配置中明确指定 `period = hour`。
+- 程序会在配置加载完成后，将每个小时级任务复制成 24 份，它们的 `due_time` 分别为初始 `due_time` 加上 0~23 小时，名称为原始名称加上小时后缀，以便报警时区分。
+- 小时级任务除了 `BASETIME` 以外，还有一个特有的环境变量 `DUETIME`，表示作业被调起的时间。这样用户的 sql 就可以关联到作业的调起时间，比如“每个小时检查 3 小时之前的数据”，这一功能是无法通过 `BASETIME` 变量实现的。
