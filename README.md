@@ -242,10 +242,11 @@ data-monitor: monitor databases and alarm when data is not as expected
 optional arguments:
   -h, --help            show this help message and exit
   -c JOB_CONFIG_FILES, --config-file JOB_CONFIG_FILES
-                        path of job config file, if not provided, use
-                        `job.cfg` under current path. you can provide multiple
-                        config files by repeating `-c` option, conflicted job
-                        names will be auto-detected.
+                        path(s) of job config file. support wildcards (path
+                        contains wildcards must be quoted). if not provided,
+                        use `job.cfg` under current path. you can provide
+                        multiple config files by repeating `-c` option.
+                        conflicted job names will be auto-detected.
   --db-config-file DB_CONFIG_FILE
                         path of database config file, if not provided, use
                         `database.cfg` under current path.

@@ -7,6 +7,7 @@ from collections import namedtuple
 import concurrent.futures
 from contextlib import closing
 import datetime
+import glob
 import logging
 import os
 import re
@@ -105,6 +106,7 @@ def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interva
     # 任务队列，使用优先队列，优先级为作业到期时间
     task_queue = Queue.PriorityQueue()
 
+    logger.info('using job config file(s): {}'.format(job_config_files))
     logger.info('checking job configs ...')
     for job in get_job_conf_list(db_config_file, job_config_files, job_names):
         logger.info('job [{}] config OK.'.format(job['_name']))
@@ -190,8 +192,10 @@ def execute(default_db_config_file, default_job_config_file):
         description='data-monitor: monitor databases and alarm when data is not as expected')
     parser.add_argument(
         '-c', '--config-file', dest='job_config_files', action='append',
-        help='path of job config file, if not provided, use `job.cfg` under current path. '
-            'you can provide multiple config files by repeating `-c` option, '
+        help='path(s) of job config file. '
+            'support wildcards (path contains wildcards must be quoted). '
+            'if not provided, use `job.cfg` under current path. '
+            'you can provide multiple config files by repeating `-c` option. '
             'conflicted job names will be auto-detected.')
     parser.add_argument(
         '--db-config-file', dest='db_config_file',
@@ -215,10 +219,14 @@ def execute(default_db_config_file, default_job_config_file):
         db_config_file = default_db_config_file
 
     if args.job_config_files:
-        for file in args.job_config_files:
-            if not os.path.isfile(file):
-                raise ValueError('job config file "{}" not exists'.format(file))
-        job_config_files = args.job_config_files
+        job_config_files = []
+        for glob_path in args.job_config_files:
+            paths = glob.glob(glob_path)
+            if not paths:
+                raise ValueError('job config path "{}" not exists'.format(glob_path))
+            for file in paths:
+                if os.path.isfile(file):
+                    job_config_files.append(file)
     else:
         job_config_files = [default_job_config_file]
 
