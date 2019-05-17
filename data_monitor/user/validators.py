@@ -9,7 +9,7 @@
 
 
 from ..context import register_validator
-from ..util import ValidateFailInfo
+from ..util import AlarmInfo
 
 
 @register_validator
@@ -77,5 +77,5 @@ def diff(data1, data2, threshold=1e-6, direction=0):
     if diff is not None:
         res = res.assign(diff=diff)
     res.reset_index(inplace=True, drop=True)
-    info = ValidateFailInfo('diff', res)
+    info = AlarmInfo('diff', res)
     return False, info

@@ -11,6 +11,6 @@
 from collections import namedtuple
 
 
-ValidateFailInfo = namedtuple('ValidateFailInfo', ['type', 'content'])
+AlarmInfo = namedtuple('AlarmInfo', ['type', 'content'])
 
 class ValidatorError(ValueError): pass

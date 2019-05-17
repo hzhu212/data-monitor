@@ -20,7 +20,7 @@ from .alarm import format_baidu_hi, send_baidu_hi, format_email, send_email
 from .config import get_job_conf_list
 from .context import get_validator_context
 from .db import get_connection
-from .util import ValidateFailInfo, ValidatorError
+from .util import AlarmInfo, ValidatorError
 
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(name)s %(levelname)s: %(message)s')
@@ -82,17 +82,17 @@ def run_job(job):
         # 如果用户 validator 中同时返回了 ok 和 info，则直接使用
         ok, info = ret
 
-        # 确保 info 为 ValidateFailInfo 类型
-        if not isinstance(info, ValidateFailInfo):
+        # 确保 info 为 AlarmInfo 类型
+        if not isinstance(info, AlarmInfo):
             try:
-                info = ValidateFailInfo(*info)
+                info = AlarmInfo(*info)
             except:
-                info = ValidateFailInfo(None, info)
+                info = AlarmInfo(None, info)
 
     except (TypeError, ValueError):
         # 否则，认为用户只返回了 ok，使用 SQL 查询结果作为默认的 info。
         ok = ret
-        info = ValidateFailInfo('default', results)
+        info = AlarmInfo('default', results)
 
     return bool(ok), info
 
@@ -155,7 +155,7 @@ def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interva
                         logger.error('job [{}] raised an exception:'.format(job['_name']))
                         logger.exception(e)
                         ok = False
-                        info_obj = ValidateFailInfo('exception', traceback.format_exc())
+                        info_obj = AlarmInfo('exception', traceback.format_exc())
 
                     # job 校验成功，打印日志，此 job 完成
                     if ok:

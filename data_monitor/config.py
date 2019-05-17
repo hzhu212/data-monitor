@@ -23,7 +23,9 @@ except ImportError:
 
 import jinja2
 
+from .alarm import format_baidu_hi, send_baidu_hi, format_email, send_email
 from .context import get_filter_context
+from .util import AlarmInfo
 
 
 logger = logging.getLogger(__name__)
@@ -74,13 +76,20 @@ def check_job_config(job_conf, db_configs):
     """检查某个具体作业的配置。如果配置有误，将打印报错信息并跳过该作业。"""
     try:
         return _check_job_config(job_conf, db_configs)
-    except Exception as e:
-        logger.exception(e)
+    except ConfigError as e:
+        logger.error('job [{}] config error: {}'.format(job_conf['_name'], e))
+        info = AlarmInfo('config_error', e)
+        send_baidu_hi(job_conf['alarm_hi'], format_baidu_hi(job_conf, info))
+        send_email(job_conf['alarm_email'], format_email(job_conf, info))
         return None
 
 
 def _check_job_config(job_conf, db_configs):
     """检查用户配置"""
+
+    # 首先将 alarm_hi、alarm_email 准备就绪，以便发生配置错误时可以报警
+    job_conf['alarm_hi'] = [s for s in job_conf['alarm_hi'].split(',')] if 'alarm_hi' in job_conf else []
+    job_conf['alarm_email'] = [s for s in job_conf['alarm_email'].split(',')] if 'alarm_email' in job_conf else []
 
     # 检查必选配置项
     REQUIRED_OPTIONS = (
@@ -88,7 +97,7 @@ def _check_job_config(job_conf, db_configs):
         'sql', 'validator', )
     for op in REQUIRED_OPTIONS:
         if op not in job_conf:
-            raise ConfigError('job [{}]: option "{}" is required'.format(job_conf['_name'], op))
+            raise ConfigError('option "{}" is required'.format(op))
 
     # 检查枚举类型配置项
     enums = {
@@ -97,34 +106,34 @@ def _check_job_config(job_conf, db_configs):
     }
     for k, scope in enums.items():
         if job_conf[k] not in scope:
-            raise ConfigError(
-                'job [{}]: option "{}" should be in "{}"'
-                .format(job_conf['_name'], k, list(scope)))
+            raise ConfigError('option "{}" should be in "{}"'.format(k, list(scope)))
 
+    # 解析 is_active
+    job_conf['is_active'] = True if job_conf['is_active'].lower() == 'true' else False
 
-    # DUETIME 环境变量只允许用在 sql 选项中
-    for k, v in job_conf.items():
-        if 'DUETIME' in v and k != 'sql':
-            raise ConfigError(
-                'job [{}]: environment variable "DUETIME" can only be used '
-                'in option "sql"'.format(job_conf['_name']))
+    # 解析 due_time
+    try:
+        job_conf['due_time'] = dateparser.parse(job_conf['due_time'])
+    except:
+        raise ConfigError('due_time {!r} can not be parsed'.format(job_conf['due_time']))
 
+    # # DUETIME 环境变量只允许用在 sql 选项中
+    # for k, v in job_conf.items():
+    #     if 'DUETIME' in v and k != 'sql':
+    #         raise ConfigError(
+    #             'environment variable "DUETIME" should only be used in option "sql"')
 
     # retry_times 应为整数
     try:
         job_conf['retry_times'] = int(job_conf['retry_times'])
     except ValueError as e:
         raise ConfigError(
-            'job [{}]: option "retry_times" should be an integer, but {!r} '
-            'got'.format(job_conf['_name'], job_conf['retry_times']))
-
+            'option "retry_times" should be an integer, but {!r} got'.format(job_conf['retry_times']))
 
     # retry_interval 应该符合格式 HH:MM:SS
     m = re_time.match(job_conf['retry_interval'])
     if not m:
-        raise ConfigError(
-            'job [{}]: option "retry_interval" should be in format of "HH:MM[:SS]"'
-            .format(job_conf['_name']))
+        raise ConfigError('option "retry_interval" should be in format of "HH:MM[:SS]"')
 
     # retry_interval 应能被解析成 datetime.timedelta
     try:
@@ -133,8 +142,8 @@ def _check_job_config(job_conf, db_configs):
             hours=parsed.hour, minutes=parsed.minute, seconds=parsed.second)
     except ValueError as e:
         raise ConfigError(
-            'job [{}]: can not parse retry_interval("{}") into datetime.timedelta'
-            .format(job_conf['_name'], job_conf['retry_interval']))
+            'can not parse retry_interval("{}") into datetime.timedelta'
+            .format(job_conf['retry_interval']))
 
     # 将 db_conf, database, sql 分别处理成列表，并保证三者的长度等长（database 可为空）
     job_conf['db_conf'] = [s.strip() for s in job_conf['db_conf'].split(',') if s.strip()]
@@ -146,13 +155,9 @@ def _check_job_config(job_conf, db_configs):
 
     len1, len2, len3 = len(job_conf['db_conf']), len(job_conf['database']), len(job_conf['sql'])
     if len2 != 0 and len2 != len1:
-        raise ConfigError(
-            'job [{}]: "db_conf" contains {} elements but "database" contains {}'
-            .format(job_conf['_name'], len1, len2))
+        raise ConfigError('"db_conf" contains {} elements but "database" contains {}'.format(len1, len2))
     if len1 != len3:
-        raise ConfigError(
-            'job [{}]: "db_conf" contains {} elements but "sql" contains {}'
-            .format(job_conf['_name'], len1, len3))
+        raise ConfigError('"db_conf" contains {} elements but "sql" contains {}'.format(len1, len3))
 
     # 检查 db_conf 是否合法
     for name in job_conf['db_conf']:
@@ -177,17 +182,9 @@ def _check_job_config(job_conf, db_configs):
         eval(job_conf['validator'], {'__builtins__': {}}, dict(get_validator_context(), result=None))
     except (SyntaxError, NameError) as e:
         tb = traceback.format_exc()
-        raise ConfigError(
-            'job [{}]: error in option "validator", traceback is: \n{}'
-            .format(job_conf['_name'], tb))
+        raise ConfigError('error in option "validator", traceback is: \n{}'.format(tb))
     except:
         pass
-
-    # 将选项从字符串转为标准化，如数字、时间、列表等
-    job_conf['is_active'] = True if job_conf['is_active'] == 'true' else False
-    job_conf['due_time'] = dateparser.parse(job_conf['due_time'])
-    job_conf['alarm_hi'] = [s for s in job_conf['alarm_hi'].split(',')]
-    job_conf['alarm_email'] = [s for s in job_conf['alarm_email'].split(',')]
 
     # 从 db_configs 中取出对应的 db_conf 替换 db_conf 字段
     for i, name in enumerate(job_conf['db_conf']):
@@ -333,4 +330,4 @@ def get_job_conf_list(db_config_file, job_config_files, job_names):
                 yield render_depending_job_conf(new_job_conf)
 
         else:
-            raise ConfigError('Invalid period: {!r}'.format(job_conf['period']))
+            pass

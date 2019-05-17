@@ -28,6 +28,16 @@ def format_baidu_hi(job, info):
         type_ = None
         content = info
 
+    # 配置错误，任何配置项都可能缺失，因此要保证最精简的提示信息
+    if type_ == 'config_error':
+        msg = [
+            'job: {}'.format(job['_name']),
+            '=' * 20,
+            'reason: job config error',
+            '-' * 20,
+            repr(content), ]
+        return '\n'.join(msg)
+
     msg = [
         'job: {}'.format(job['_name']),
         'due time: {}'.format(job['due_time']),
@@ -74,6 +84,12 @@ def format_email(job, info):
         type_ = None
         content = info
 
+    if type_ == 'config_error':
+        template_file = os.path.join(template_dir, 'config_error.html')
+        with open(template_file, 'r') as f:
+            msg = f.read().format(job=job, content=repr(content))
+            return msg
+
     if type_ == 'diff':
         template_file = os.path.join(template_dir, 'diff.html')
         try:
@@ -90,7 +106,6 @@ def format_email(job, info):
         template_file = os.path.join(template_dir, 'default.html')
 
     htmled_sql = '<hr/>'.join('<p>' + s.replace('\n', '</p><p>') + '</p>' for s in job['sql'])
-    # htmled_sql = htmled_sql.replace('<p>', '<p style="margin: 0 5px">')
     with open(template_file, 'r') as f:
         msg = f.read().format(
             job=dict(job, validator=job['validator'].encode('utf8')),
