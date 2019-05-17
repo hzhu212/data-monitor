@@ -35,7 +35,7 @@ def format_baidu_hi(job, info):
             '=' * 20,
             'reason: job config error',
             '-' * 20,
-            repr(content), ]
+            str(content), ]
         return '\n'.join(msg)
 
     msg = [
@@ -86,8 +86,10 @@ def format_email(job, info):
 
     if type_ == 'config_error':
         template_file = os.path.join(template_dir, 'config_error.html')
+        content = str(content).replace('\t', ' '*4).replace(' ', '&nbsp;').replace('\n', '</p><p>')
+        content = '<p>' + content + '</p>'
         with open(template_file, 'r') as f:
-            msg = f.read().format(job=job, content=repr(content))
+            msg = f.read().format(job=job, content=content)
             return msg
 
     if type_ == 'diff':
