@@ -72,10 +72,10 @@ def detect_configs_conflict(config_files, key=None):
 
 # 检查作业配置
 # ------------------------------------------------------------------------------
-def check_job_config(job_conf, db_configs):
+def check_out_job_config(job_conf, db_configs):
     """检查某个具体作业的配置。如果配置有误，将打印报错信息并跳过该作业。"""
     try:
-        return _check_job_config(job_conf, db_configs)
+        return _check_out_job_config(job_conf, db_configs)
     except ConfigError as e:
         logger.error('job [{}] config error: {}'.format(job_conf['_name'], e))
         info = AlarmInfo('config_error', e)
@@ -84,7 +84,7 @@ def check_job_config(job_conf, db_configs):
         return None
 
 
-def _check_job_config(job_conf, db_configs):
+def _check_out_job_config(job_conf, db_configs):
     """检查用户配置"""
 
     # 首先将 alarm_hi、alarm_email 准备就绪，以便发生配置错误时可以报警
@@ -107,6 +107,12 @@ def _check_job_config(job_conf, db_configs):
     for k, scope in enums.items():
         if job_conf[k] not in scope:
             raise ConfigError('option "{}" should be in "{}"'.format(k, list(scope)))
+
+    # 渲染配置项
+    try:
+        job_conf = render_job_conf(job_conf)
+    except Exception as e:
+        raise ConfigError('failed rendering config: \n{}'.format(e))
 
     # 解析 is_active
     job_conf['is_active'] = True if job_conf['is_active'].lower() == 'true' else False
@@ -232,7 +238,10 @@ def render_job_conf(job_conf):
         if isinstance(v, basestring) and '{' in v:
             # 把依赖性变量暂时 escape 掉，渲染完成后再还原
             v = _escape_vars(v, DEPENDING_VARS)
-            v = env.from_string(v).render()
+            try:
+                v = env.from_string(v).render()
+            except Exception as e:
+                raise ValueError('option `{}={}` render error: \n{}'.format(k, v, e))
             job_conf[k] = _unescape_vars(v, DEPENDING_VARS)
 
     return job_conf
@@ -298,11 +307,8 @@ def get_job_conf_list(db_config_file, job_config_files, job_names):
         # 获取 job_conf，并将 job 名称绑定到一个私有属性 _name 上
         job_conf = dict(job_configs[job_name], _name=job_name)
 
-        # 渲染配置项
-        job_conf = render_job_conf(job_conf)
-
         # 检查作业配置，如果有误将打印错误并跳过该作业
-        job_conf = check_job_config(job_conf, db_configs)
+        job_conf = check_out_job_config(job_conf, db_configs)
         if job_conf is None:
             continue
 
@@ -316,6 +322,7 @@ def get_job_conf_list(db_config_file, job_config_files, job_names):
             # 如果 due_time 不是当天则跳过
             today = datetime.date.today()
             if job_conf['due_time'].date() != today:
+                logger.info('skiped unscheduled job: [{}] at {}'.format(job_name, job_conf['due_time']))
                 continue
             yield job_conf
 
