@@ -1,8 +1,7 @@
 # user files
-nobone_sync_config.js
 /tests
-/database.cfg
-/job.cfg
+/*.cfg
+/!*.default.cfg
 /sftp-config.json
 
 # OS generated files
