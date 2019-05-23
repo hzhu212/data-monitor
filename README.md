@@ -69,10 +69,9 @@ data-monitor 包含两个配置文件：
 [palo_gaia_db]              ; 配置组名称，可在 job.cfg 中通过 `db_conf` 字段进行引用。
 host = palo-yqa.baidu.com   ; 数据库 host 地址
 port = 9030                 ; 数据库端口号
-port_mini_load = 8030       ; Palo mini load 专用端口号
 user = gaia_user            ; 数据库用户名
 passwd = ******             ; 数据库密码
-db = gaia_db                ; 默认使用的数据库名称（USE db）
+database = gaia_db          ; 默认使用的数据库名称（USE db）
 charset = utf8              ; 数据库编码
 ```
 
@@ -169,14 +168,14 @@ alarm_email = zhuhe02
 其中，`db_conf`、`alarm_hi`、`alarm_email` 的含义显而易见，其余几条配置需要额外说明一下：
 
 - `due_time`：
-	+ 花括号代表该块内容需要动态渲染（这是一种常见的模板语法，一般使用 Python 的 `str.format` 函数就可以做渲染，但此处需要支持管道操作，因此采用了更高级的 jinja2 包做渲染）。
-	+ `BASETIME` 是程序传递给配置文件的环境变量，是一个日期时间类型（类似 2019-05-14 00:00:00），目前采用的值为“监控程序启动当天的零点整”。
+	+ 花括号代表该内容块需要动态渲染（针对简单的模板渲染，一般可采用 Python 的 `str.format` 函数，但此处需要支持管道过滤器操作，因此采用了更高级的 [jinja2](http://docs.jinkan.org/docs/jinja2/) 包做渲染）。
+	+ `BASETIME` 是程序传递给配置文件的环境变量，是一个日期时间类型（类似 `2019-05-14 00:00:00`），目前采用的值为“监控程序启动当天的零点整”。
 	+ `| dt_set(hour=9, mimute=30)` 是一个管道操作（在 jinja2 中称为过滤），其作用是把管道符之前的值（`BASETIME`）通过函数处理一下，得到一个新的值。其中，`dt_set`（set datetime）是一个过滤器，用于计算绝对日期时间。整个表达式 `BASETIME | dt_set(hour=9, mimute=30)` 的含义就是把 `BASETIME` 的小时数设为 `9`，分钟数设为 `30`，得到一个新的时间，即 `BASETIME` 当天的 09:30。
-	+ 过滤器函数可由用户自由定制，目前已实现的过滤器包括 `dt_set`、`dt_add`、`dt_format` 都是自定义的（分别用于生成绝对时间、相对时间、格式化时间字符串），你可以在 `data_monitor/user/filters.py` 中查看它们的定义。如果这些过滤器不能满足你的需求，欢迎定义自己的过滤器。
+	+ 过滤器函数可由用户自由定制，目前已实现的过滤器包括 `dt_set`、`dt_add`、`dt_format`，分别用于生成绝对时间、相对时间、格式化时间字符串。你可以在 `data_monitor/user/filters.py` 中查看它们的定义。如果这些过滤器不能满足你的需求，欢迎定义自己的过滤器。
 
 - `sql`：
 	+ 前半部分容易理解，就是一个普通的 SQL 查询语句。
-	+ `%(YESTERDAY)s` 是一个配置引用，这是 `.cfg` 格式支持的一种语法，用于引用已存在的别的配置项的值。被引用的 `YESTERDAY` 已经定义在 `[DEFAULT]` section 中。
+	+ `%(YESTERDAY)s` 是一个配置项引用，这是 `.cfg` 格式支持的一种语法，用于引用其他已存在的配置项的值。被引用的 `YESTERDAY` 已经定义在 `[DEFAULT]` section 中。
 
 - `validator`：
 	+ `result > 40` 是一个合法的 Python 表达式，如果 `result` 大于 `40`，将返回 `True`，否则返回 `False`。
@@ -344,8 +343,8 @@ alarm_email = zhuhe02
 该示例的 `validator` 中使用了自定义校验函数 `claim` 和 `gt`，这些函数定义在 `data_monitor/user/validators.py` 中。其中：
 
 - `claim` 函数用于断言一个 SQL 查询结果集。接收两个参数，参数一为查询结果集，参数二是一个“谓词函数”，接收一个单值并返回一个布尔值。
-- `gt(50)` 是一个谓词函数，用于判定一个值是否“大于50”。类似的谓词还有 `ge`、`lt`、`le`、`eq`、`ne`，分别用于判定大于等于、小于、小于等于、等于、不等于。
-- 整个 validator 表达式的含义就是：判断查询结果集的 value 列（最后一列）的数据是否都大于50，如果有任意一个不大于50，则触发警报。警报中会给出所有不大于50的行。
+- `gt(50)` 是一个谓词函数，用于判定一个值是否“大于50”。类似的谓词还有 `ge`、`lt`、`le`、`eq`、`ne`，分别用于判定：大于等于、小于、小于等于、等于、不等于。
+- 整个 validator 表达式的含义就是：判断查询结果集的 value 列（最后一列）的数据是否都大于50，如果有任意一个不大于50，则触发警报。警报中会列出所有不大于50的行。
 
 如果校验失败，将发出类似下面的警报：
 
@@ -470,4 +469,15 @@ validator is: `diff(result[0], result[1], threshold=1)`
 
 - 需要在配置中明确指定 `period = hour`。
 - 程序会在配置加载完成后，将每个小时级任务复制成 24 份，它们的 `due_time` 分别为初始 `due_time` 加上 0~23 小时，名称为原始名称加上小时后缀，以便报警时区分。
-- 小时级任务除了 `BASETIME` 以外，还有一个特有的环境变量 `DUETIME`，表示作业被调起的时间。这样用户的 sql 就可以关联到作业的调起时间，比如“每个小时检查 3 小时之前的数据”，这一功能是无法通过 `BASETIME` 变量实现的。
+- 小时级任务除了 `BASETIME` 以外，还有一个特有的环境变量 `DUETIME`，表示作业被调起的时间。这样用户的 sql 就可以关联到作业的调起时间，比如“每个小时检查 3 小时之前的数据是否就绪”，就可以这么设置：
+
+```ini
+period = hour
+sql = 
+    SELECT count(*) AS num
+    FROM some_table
+    WHERE 
+        event_day = '%(TODAY)s'
+        AND hour = '{DUETIME | dt_add(hours=-3) | dt_format('%H')}'
+validator = result > 0
+```
