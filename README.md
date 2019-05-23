@@ -465,19 +465,103 @@ validator is: `diff(result[0], result[1], threshold=1)`
 
 ### 小时级数据监控
 
+```ini
+[demo_hourly_job]
+; 小时级监控
+period = hour
+due_time = {BASETIME | dt_set(hour=6)}
+db_conf = mysql
+sql =
+    SELECT count(*)
+    FROM ud_al_ps_insight_hour_province
+    WHERE
+        stat_date = %(TODAY)s
+        ; 注意，这里使用 DUETIME 而不是 BASETIME！
+        AND stat_hour = '{DUETIME | dt_add(hours=-6) | dt_format('%%H')}'
+validator = result > 0
+alarm_hi = zhuhe02_02
+alarm_email = zhuhe02
+```
+
+该作业实现的功能是：每个小时检查六小时之前的那个小时的数据是否已就绪，如果未就绪则发出警报。
+
 小时级任务比起其他任务有些特殊，主要体现在以下几个方面：
 
 - 需要在配置中明确指定 `period = hour`。
 - 程序会在配置加载完成后，将每个小时级任务复制成 24 份，它们的 `due_time` 分别为初始 `due_time` 加上 0~23 小时，名称为原始名称加上小时后缀，以便报警时区分。
-- 小时级任务除了 `BASETIME` 以外，还有一个特有的环境变量 `DUETIME`，表示作业被调起的时间。这样用户的 sql 就可以关联到作业的调起时间，比如“每个小时检查 3 小时之前的数据是否就绪”，就可以这么设置：
+- 小时级任务除了 `BASETIME` 以外，还有一个特有的环境变量 `DUETIME`，表示作业被调起的时间。这样用户的 sql 就可以关联到作业的调起时间，比如“每个小时检查 6 小时之前的数据是否就绪”。
 
-```ini
-period = hour
-sql = 
-    SELECT count(*) AS num
-    FROM some_table
-    WHERE 
-        event_day = '%(TODAY)s'
-        AND hour = '{DUETIME | dt_add(hours=-3) | dt_format('%H')}'
-validator = result > 0
+执行小时级的任务，打印的日志也会体现出 24 个作业：
+
+```sh
+python main.py -j demo_hourly_job
+```
+
+```
+[2019-05-23 16:12:12,332] data_monitor INFO: using job config file(s): ['/home/work/zhuhe02/workspace/data-monitor/job.cfg']
+[2019-05-23 16:12:12,332] data_monitor INFO: checking job configs ...
+[2019-05-23 16:12:12,369] data_monitor INFO: job [demo_hourly_job_hour06] config OK.
+[2019-05-23 16:12:12,372] data_monitor INFO: job [demo_hourly_job_hour07] config OK.
+[2019-05-23 16:12:12,375] data_monitor INFO: job [demo_hourly_job_hour08] config OK.
+[2019-05-23 16:12:12,377] data_monitor INFO: job [demo_hourly_job_hour09] config OK.
+[2019-05-23 16:12:12,380] data_monitor INFO: job [demo_hourly_job_hour10] config OK.
+[2019-05-23 16:12:12,382] data_monitor INFO: job [demo_hourly_job_hour11] config OK.
+[2019-05-23 16:12:12,385] data_monitor INFO: job [demo_hourly_job_hour12] config OK.
+[2019-05-23 16:12:12,387] data_monitor INFO: job [demo_hourly_job_hour13] config OK.
+[2019-05-23 16:12:12,391] data_monitor INFO: job [demo_hourly_job_hour14] config OK.
+[2019-05-23 16:12:12,394] data_monitor INFO: job [demo_hourly_job_hour15] config OK.
+[2019-05-23 16:12:12,397] data_monitor INFO: job [demo_hourly_job_hour16] config OK.
+[2019-05-23 16:12:12,400] data_monitor INFO: job [demo_hourly_job_hour17] config OK.
+[2019-05-23 16:12:12,403] data_monitor INFO: job [demo_hourly_job_hour18] config OK.
+[2019-05-23 16:12:12,406] data_monitor INFO: job [demo_hourly_job_hour19] config OK.
+[2019-05-23 16:12:12,409] data_monitor INFO: job [demo_hourly_job_hour20] config OK.
+[2019-05-23 16:12:12,412] data_monitor INFO: job [demo_hourly_job_hour21] config OK.
+[2019-05-23 16:12:12,415] data_monitor INFO: job [demo_hourly_job_hour22] config OK.
+[2019-05-23 16:12:12,418] data_monitor INFO: job [demo_hourly_job_hour23] config OK.
+[2019-05-23 16:12:12,420] data_monitor INFO: job [demo_hourly_job_hour00] config OK.
+[2019-05-23 16:12:12,423] data_monitor INFO: job [demo_hourly_job_hour01] config OK.
+[2019-05-23 16:12:12,425] data_monitor INFO: job [demo_hourly_job_hour02] config OK.
+[2019-05-23 16:12:12,428] data_monitor INFO: job [demo_hourly_job_hour03] config OK.
+[2019-05-23 16:12:12,430] data_monitor INFO: job [demo_hourly_job_hour04] config OK.
+[2019-05-23 16:12:12,433] data_monitor INFO: job [demo_hourly_job_hour05] config OK.
+[2019-05-23 16:12:12,433] data_monitor INFO: all job configs OK.
+[2019-05-23 16:12:12,433] data_monitor INFO: monitor start ...
+[2019-05-23 16:12:12,433] data_monitor INFO: ============================================================
+[2019-05-23 16:12:12,433] data_monitor INFO: ****** total jobs: 24 ...
+[2019-05-23 16:12:12,434] data_monitor INFO: ****** pending: 24, running: 0, completed: 0 ******
+[2019-05-23 16:12:12,442] data_monitor INFO: job [demo_hourly_job_hour06] is due. launched.
+[2019-05-23 16:12:12,443] data_monitor INFO: ****** pending: 23, running: 1, completed: 0 ******
+[2019-05-23 16:12:12,443] data_monitor INFO: job [demo_hourly_job_hour07] is due. launched.
+[2019-05-23 16:12:12,459] data_monitor INFO: ****** pending: 22, running: 2, completed: 0 ******
+[2019-05-23 16:12:12,459] data_monitor INFO: job [demo_hourly_job_hour08] is due. launched.
+[2019-05-23 16:12:12,461] data_monitor INFO: ****** pending: 21, running: 3, completed: 0 ******
+[2019-05-23 16:12:12,463] data_monitor INFO: job [demo_hourly_job_hour09] is due. launched.
+[2019-05-23 16:12:12,464] data_monitor INFO: ****** pending: 20, running: 4, completed: 0 ******
+[2019-05-23 16:12:12,465] data_monitor INFO: job [demo_hourly_job_hour10] is due. launched.
+[2019-05-23 16:12:12,466] data_monitor INFO: ****** pending: 19, running: 5, completed: 0 ******
+[2019-05-23 16:12:12,467] data_monitor INFO: job [demo_hourly_job_hour11] is due. launched.
+[2019-05-23 16:12:12,468] data_monitor INFO: ****** pending: 18, running: 6, completed: 0 ******
+[2019-05-23 16:12:12,469] data_monitor INFO: job [demo_hourly_job_hour12] is due. launched.
+[2019-05-23 16:12:12,470] data_monitor INFO: ****** pending: 17, running: 7, completed: 0 ******
+[2019-05-23 16:12:12,471] data_monitor INFO: job [demo_hourly_job_hour13] is due. launched.
+[2019-05-23 16:12:12,472] data_monitor INFO: ****** pending: 16, running: 8, completed: 0 ******
+[2019-05-23 16:12:12,472] data_monitor INFO: job [demo_hourly_job_hour14] is due. launched.
+[2019-05-23 16:12:12,474] data_monitor INFO: ****** pending: 15, running: 9, completed: 0 ******
+[2019-05-23 16:12:12,477] data_monitor INFO: job [demo_hourly_job_hour15] is due. launched.
+[2019-05-23 16:12:12,479] data_monitor INFO: ****** pending: 14, running: 10, completed: 0 ******
+[2019-05-23 16:12:12,479] data_monitor INFO: job [demo_hourly_job_hour16] is due. launched.
+[2019-05-23 16:12:12,480] data_monitor INFO: ****** pending: 13, running: 11, completed: 0 ******
+[2019-05-23 16:12:17,486] data_monitor INFO: job [demo_hourly_job_hour13] returned. status: OK.
+[2019-05-23 16:12:17,486] data_monitor INFO: job [demo_hourly_job_hour11] returned. status: OK.
+[2019-05-23 16:12:17,486] data_monitor INFO: job [demo_hourly_job_hour12] returned. status: OK.
+[2019-05-23 16:12:17,486] data_monitor INFO: job [demo_hourly_job_hour08] returned. status: OK.
+[2019-05-23 16:12:17,486] data_monitor INFO: job [demo_hourly_job_hour16] returned. status: OK.
+[2019-05-23 16:12:17,486] data_monitor INFO: job [demo_hourly_job_hour06] returned. status: OK.
+[2019-05-23 16:12:17,487] data_monitor INFO: job [demo_hourly_job_hour15] returned. status: OK.
+[2019-05-23 16:12:17,487] data_monitor INFO: job [demo_hourly_job_hour07] returned. status: OK.
+[2019-05-23 16:12:17,487] data_monitor INFO: job [demo_hourly_job_hour14] returned. status: OK.
+[2019-05-23 16:12:17,487] data_monitor INFO: job [demo_hourly_job_hour09] returned. status: OK.
+[2019-05-23 16:12:17,487] data_monitor INFO: job [demo_hourly_job_hour10] returned. status: OK.
+[2019-05-23 16:12:17,487] data_monitor INFO: ****** pending: 13, running: 0, completed: 11 ******
+[2019-05-23 16:12:17,487] data_monitor INFO: sleeping until the most recent job [demo_hourly_job_hour17] due (2019-05-23 17:00:00) ...
 ```

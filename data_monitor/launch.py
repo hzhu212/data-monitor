@@ -72,6 +72,7 @@ def run_job(job):
     if len(results) == 1:
         results = results[0]
 
+    # 执行用户的校验表达式
     context = get_validator_context()
     context.update({'result': results})
     try:
