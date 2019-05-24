@@ -83,6 +83,7 @@ charset = utf8              ; 数据库编码
 
 ```ini
 [__DOC__]
+desc =      ; 必填。一句简要的作业描述，可以使用中文，将会出现在报警信息中。
 due_time =  ; 必填。该条监控的到期时间，当时钟超过该时刻后，当前监控任务将被触发。
             ; 一个 ISO 格式的日期时间字符串，可通过 BASETIME 环境变量生成（见下文）。
             ; 对于天级以上（周级、月级、年级）的监控，仅当 due_time 设定的日期刚好是当天时，才触发监控；
@@ -152,8 +153,9 @@ YESTERDAY_ISO = {BASETIME | dt_add(days=-1) | dt_format('%%Y-%%m-%%d')}
 下面是一个简单的配置示例：
 
 ```ini
-[demo_simple_value]
-; 简单的单值监控
+[demo_single_value]
+; 单值监控
+desc = 演示作业-单值监控
 due_time = {BASETIME | dt_set(hour=9, mimute=30)}	; 触发时间为 BASETIME 当天 09:30
 db_conf = palo_muse
 sql =
@@ -183,7 +185,8 @@ alarm_email = zhuhe02
 当校验失败时，将发出类似下面的警报：
 
 ```
-job: demo_simple_value
+🙏 演示作业-单值监控
+job: demo_single_value
 due time: 2019-05-14 09:00:00
 ====================
 reason: validator not pass
@@ -199,15 +202,15 @@ with `result` as: `38L`
 对于上一节的配置示例，我们可以通过如下命令发起该监控作业：
 
 ```sh
-python main.py --job demo_simple_value
+python main.py --job demo_single_value
 # 或者
-# python main.py -j demo_simple_value
+# python main.py -j demo_single_value
 ```
 
 如果你有多个监控作业需要发起，可多次使用 `--job` 选项，例如：
 
 ```sh
-python main.py -j demo_simple_value -j another_job
+python main.py -j demo_single_value -j another_job
 ```
 
 也可以不指定 `--job` 选项，这样将会发起配置文件中所有激活的作业：
@@ -263,21 +266,22 @@ optional arguments:
 [2019-05-14 18:28:36,328] data_monitor INFO: job [demo_two_table_diff] config OK.
 [2019-05-14 18:28:36,338] data_monitor INFO: job [demo_simple_value_with_sql_in_file] config OK.
 [2019-05-14 18:28:36,355] data_monitor INFO: job [demo_simple_diff] config OK.
-[2019-05-14 18:28:36,367] data_monitor INFO: job [demo_simple_value] config OK.
+[2019-05-14 18:28:36,367] data_monitor INFO: job [demo_single_value] config OK.
 [2019-05-14 18:28:36,367] data_monitor INFO: all job configs OK.
 [2019-05-14 18:28:36,367] data_monitor INFO: monitor start ...
 [2019-05-14 18:28:36,367] data_monitor INFO: ============================================================
 [2019-05-14 18:28:36,367] data_monitor INFO: ****** total jobs: 4 ...
 [2019-05-14 18:28:36,368] data_monitor INFO: ****** pending: 4, running: 0, completed: 0 ******
-[2019-05-14 18:28:36,372] data_monitor INFO: job [demo_simple_value] is due. launched.
+[2019-05-14 18:28:36,372] data_monitor INFO: job [demo_single_value] is due. launched.
 [2019-05-14 18:28:36,373] data_monitor INFO: ****** pending: 3, running: 1, completed: 0 ******
 [2019-05-14 18:28:36,374] data_monitor INFO: job [demo_simple_value_with_sql_in_file] is due. launched.
 [2019-05-14 18:28:36,375] data_monitor INFO: ****** pending: 2, running: 2, completed: 0 ******
 [2019-05-14 18:28:36,376] data_monitor INFO: job [demo_two_table_diff] is due. launched.
 [2019-05-14 18:28:36,377] data_monitor INFO: ****** pending: 1, running: 3, completed: 0 ******
 [2019-05-14 18:28:36,379] data_monitor INFO: job [demo_simple_diff] is due. launched.
-[2019-05-14 18:28:36,493] data_monitor INFO: job [demo_simple_value] returned. status: =====> ALARM <=====
-	job: demo_simple_value
+[2019-05-14 18:28:36,493] data_monitor INFO: job [demo_single_value] returned. status: =====> ALARM <=====
+    🙏 演示作业-单值监控
+	job: demo_single_value
 	due time: 2019-05-14 09:00:00
 	====================
 	reason: validator not pass
@@ -300,6 +304,7 @@ optional arguments:
 
 ```ini
 [demo_single_value]
+desc = 演示作业-单值监控
 due_time = {BASETIME | dt_set(hour=9)}
 db_conf = palo_muse
 sql =
@@ -314,6 +319,7 @@ alarm_email = zhuhe02
 如果校验失败，将发出类似下面的警报：
 
 ```
+🙏 演示作业-单值监控
 job: demo_single_value
 due time: 2019-05-17 09:00:00
 ====================
@@ -327,6 +333,7 @@ with `result` as: `47L`
 
 ```ini
 [demo_single_table]
+desc = 演示作业-单表监控
 due_time = {BASETIME | dt_set(hour=9)}
 db_conf = palo_muse
 sql =
@@ -349,6 +356,7 @@ alarm_email = zhuhe02
 如果校验失败，将发出类似下面的警报：
 
 ```
+🙏 演示作业-单表监控
 job: demo_single_table
 due time: 2019-05-17 09:00:00
 ====================
@@ -385,6 +393,7 @@ validator = claim(result, ors(ands(gt(50), lt(60), ne(55)), eq(0)))
 
 ```ini
 [demo_diff_value]
+desc = 演示作业-单值 diff
 due_time = {BASETIME | dt_set(hour=9)}
 db_conf = palo_muse, palo_muse_new
 _sql =
@@ -400,6 +409,7 @@ alarm_email = zhuhe02
 如果校验失败，将发出类似下面的警报：
 
 ```
+🙏 演示作业-单值 diff
 job: demo_simple_diff
 due time: 2019-05-14 09:00:00
 ====================
@@ -413,6 +423,7 @@ with `result` as: `[47L, 48L]`
 
 ```ini
 [demo_diff_table]
+desc = 演示作业-两表 diff
 due_time = {BASETIME | dt_set(hour=9)}
 db_conf = palo_muse, palo_muse_new
 sql =
@@ -435,6 +446,7 @@ alarm_email = zhuhe02
 其中，`diff(result[0], result[1], threshold=1)` 的含义是对 `result[0]` 和 `result[1]` 做 diff，如果 diff 的绝对值超过 `threshold`，则发出警报。警报信息中会给出所有不满足条件的行，示例如下：
 
 ```
+🙏 演示作业-两表 diff
 job: demo_two_table_diff
 due time: 2019-05-14 09:00:00
 ====================
@@ -468,6 +480,7 @@ validator is: `diff(result[0], result[1], threshold=1)`
 ```ini
 [demo_hourly_job]
 ; 小时级监控
+desc = 演示作业-小时级监控
 period = hour
 due_time = {BASETIME | dt_set(hour=6)}
 db_conf = mysql

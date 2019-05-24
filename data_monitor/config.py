@@ -93,8 +93,8 @@ def _check_out_job_config(job_conf, db_configs):
 
     # 检查必选配置项
     REQUIRED_OPTIONS = (
-        'period', 'is_active', 'alarm_hi', 'alarm_email', 'due_time', 'db_conf',
-        'sql', 'validator', )
+        'desc', 'period', 'is_active', 'alarm_hi', 'alarm_email', 'due_time',
+        'db_conf', 'sql', 'validator', )
     for op in REQUIRED_OPTIONS:
         if op not in job_conf:
             raise ConfigError('option "{}" is required'.format(op))
@@ -122,6 +122,10 @@ def _check_out_job_config(job_conf, db_configs):
         job_conf['due_time'] = dateparser.parse(job_conf['due_time'])
     except:
         raise ConfigError('due_time {!r} can not be parsed'.format(job_conf['due_time']))
+
+    # 编码 description
+    if isinstance(job_conf['desc'], unicode):
+        job_conf['desc'] = job_conf['desc'].encode('utf8')
 
     # # DUETIME 环境变量只允许用在 sql 选项中
     # for k, v in job_conf.items():

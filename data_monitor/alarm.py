@@ -28,7 +28,7 @@ def format_baidu_hi(job, info):
         type_ = None
         content = info
 
-    # 配置错误，任何配置项都可能缺失，因此要保证最精简的提示信息
+    # 配置错误警报。由于任何配置项都可能缺失，因此要保证最精简的提示信息（只包括 job name）
     if type_ == 'config_error':
         msg = [
             'job: {}'.format(job['_name']),
@@ -39,6 +39,7 @@ def format_baidu_hi(job, info):
         return '\n'.join(msg)
 
     msg = [
+        '🙏 {}'.format(job['desc']),
         'job: {}'.format(job['_name']),
         'due time: {}'.format(job['due_time']),
         '=' * 20, ]
