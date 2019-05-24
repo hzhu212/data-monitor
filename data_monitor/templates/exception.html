@@ -13,16 +13,16 @@
     </style>
 </head>
 <body>
-    <h1>job {job[_name]}</h1>
-    <p>description: {job[desc]}</p>
-    <p>due time {job[due_time]}</p1>
+    <h2>🙏 监控描述：{job[desc]}</h2>
+    <p>作业名称：{job[_name]}</p>
+    <p>发起时间：{job[due_time]}</p1>
     <hr/>
 
-    <h2>reason: job raised an exception</h2>
+    <h2>报警原因：作业抛出异常</h2>
     <code>{content}</code>
     <hr/>
 
-    <p><b>sql</b> is: <div class="code" style="margin-left: 2em"><code>{sql}</code></div></p>
-    <p>with <code>db_conf</code>(s) as: <code>{database}</code></p>
+    <p><b>sql</b>：<div class="code" style="margin-left: 2em"><code>{sql}</code></div></p>
+    <p><code>db_conf</code>(s)：<code>{database}</code></p>
 </body>
 </html>

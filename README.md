@@ -150,19 +150,24 @@ TODAY_ISO = {BASETIME | dt_format('%%Y-%%m-%%d')}
 YESTERDAY_ISO = {BASETIME | dt_add(days=-1) | dt_format('%%Y-%%m-%%d')}
 ```
 
+配置文件中可以引用下列**环境变量**：
+
+- `BASETIME`：基准时间，datetime 类型，其值为监控程序启动当天的零点整。例如 2019-05-14 启动监控程序，则 `BASETIME = '2019-05-14 00:00:00'`。
+- `DUETIME`：作业发起时间，datetime 类型，其值为作业配置项中的 `due_time`。
+
 下面是一个简单的配置示例：
 
 ```ini
 [demo_single_value]
 ; 单值监控
-desc = 演示作业-单值监控
+desc = 演示-单值监控
 due_time = {BASETIME | dt_set(hour=9, mimute=30)}	; 触发时间为 BASETIME 当天 09:30
 db_conf = palo_muse
 sql =
     SELECT count(1)
     FROM pmc_all_channel_advertising
     WHERE event_day = '%(YESTERDAY)s'
-validator = result > 40								; 要求查询结果大于 40，否则发出警报
+validator = result > 60								; 要求查询结果大于 60，否则发出警报
 alarm_hi = zhuhe02_02
 alarm_email = zhuhe02
 ```
@@ -171,7 +176,6 @@ alarm_email = zhuhe02
 
 - `due_time`：
 	+ 花括号代表该内容块需要动态渲染（针对简单的模板渲染，一般可采用 Python 的 `str.format` 函数，但此处需要支持管道过滤器操作，因此采用了更高级的 [jinja2](http://docs.jinkan.org/docs/jinja2/) 包做渲染）。
-	+ `BASETIME` 是程序传递给配置文件的环境变量，是一个日期时间类型（类似 `2019-05-14 00:00:00`），目前采用的值为“监控程序启动当天的零点整”。
 	+ `| dt_set(hour=9, mimute=30)` 是一个管道操作（在 jinja2 中称为过滤），其作用是把管道符之前的值（`BASETIME`）通过函数处理一下，得到一个新的值。其中，`dt_set`（set datetime）是一个过滤器，用于计算绝对日期时间。整个表达式 `BASETIME | dt_set(hour=9, mimute=30)` 的含义就是把 `BASETIME` 的小时数设为 `9`，分钟数设为 `30`，得到一个新的时间，即 `BASETIME` 当天的 09:30。
 	+ 过滤器函数可由用户自由定制，目前已实现的过滤器包括 `dt_set`、`dt_add`、`dt_format`，分别用于生成绝对时间、相对时间、格式化时间字符串。你可以在 `data_monitor/user/filters.py` 中查看它们的定义。如果这些过滤器不能满足你的需求，欢迎定义自己的过滤器。
 
@@ -185,14 +189,15 @@ alarm_email = zhuhe02
 当校验失败时，将发出类似下面的警报：
 
 ```
-🙏 演示作业-单值监控
-job: demo_single_value
-due time: 2019-05-14 09:00:00
+🙏
+监控描述：演示-单值监控
+作业名称：demo_single_value
+发起时间：2019-05-24 09:00:00
 ====================
-reason: validator not pass
+报警原因：数据校验未通过
 --------------------
-validator is: `result > 40`
-with `result` as: `38L`
+校验表达式：`result > 60`
+查询结果`result`：`50L`
 ```
 
 ## 4. 使用
@@ -262,40 +267,49 @@ optional arguments:
 程序开始执行后，会在控制台中打印详细的执行日志，覆盖作业调度、是否报警、异常等各种信息。以下为某次启动 data-monitor 之后的执行日志：
 
 ```
-[2019-05-14 18:28:36,295] data_monitor INFO: checking job configs ...
-[2019-05-14 18:28:36,328] data_monitor INFO: job [demo_two_table_diff] config OK.
-[2019-05-14 18:28:36,338] data_monitor INFO: job [demo_simple_value_with_sql_in_file] config OK.
-[2019-05-14 18:28:36,355] data_monitor INFO: job [demo_simple_diff] config OK.
-[2019-05-14 18:28:36,367] data_monitor INFO: job [demo_single_value] config OK.
-[2019-05-14 18:28:36,367] data_monitor INFO: all job configs OK.
-[2019-05-14 18:28:36,367] data_monitor INFO: monitor start ...
-[2019-05-14 18:28:36,367] data_monitor INFO: ============================================================
-[2019-05-14 18:28:36,367] data_monitor INFO: ****** total jobs: 4 ...
-[2019-05-14 18:28:36,368] data_monitor INFO: ****** pending: 4, running: 0, completed: 0 ******
-[2019-05-14 18:28:36,372] data_monitor INFO: job [demo_single_value] is due. launched.
-[2019-05-14 18:28:36,373] data_monitor INFO: ****** pending: 3, running: 1, completed: 0 ******
-[2019-05-14 18:28:36,374] data_monitor INFO: job [demo_simple_value_with_sql_in_file] is due. launched.
-[2019-05-14 18:28:36,375] data_monitor INFO: ****** pending: 2, running: 2, completed: 0 ******
-[2019-05-14 18:28:36,376] data_monitor INFO: job [demo_two_table_diff] is due. launched.
-[2019-05-14 18:28:36,377] data_monitor INFO: ****** pending: 1, running: 3, completed: 0 ******
-[2019-05-14 18:28:36,379] data_monitor INFO: job [demo_simple_diff] is due. launched.
-[2019-05-14 18:28:36,493] data_monitor INFO: job [demo_single_value] returned. status: =====> ALARM <=====
-    🙏 演示作业-单值监控
-	job: demo_single_value
-	due time: 2019-05-14 09:00:00
-	====================
-	reason: validator not pass
-	--------------------
-	validator is: `result > 50`
-	with `result` as: `48L`
-[2019-05-14 18:28:36,638] data_monitor.alarm INFO: succeeded sending BaiduHi message to user "zhuhe02_02"
-[2019-05-14 18:28:36,692] data_monitor INFO: job [demo_simple_value_with_sql_in_file] returned. status: OK.
-[2019-05-14 18:28:36,692] data_monitor INFO: job [demo_simple_diff] returned. status: OK.
-[2019-05-14 18:28:36,692] data_monitor INFO: job [demo_two_table_diff] returned. status: OK.
-[2019-05-14 18:28:36,692] data_monitor INFO: ****** pending: 0, running: 0, completed: 4 ******
-[2019-05-14 18:28:36,693] data_monitor INFO: all jobs (4) finished.
-[2019-05-14 18:28:36,693] data_monitor INFO: ============================================================
-[2019-05-14 18:28:36,693] data_monitor INFO: monitor exit.
+[2019-05-24 18:03:08,475] data_monitor INFO: using job config file(s): ['/home/work/zhuhe02/workspace/data-monitor/job.cfg']
+[2019-05-24 18:03:08,475] data_monitor INFO: checking job configs ...
+[2019-05-24 18:03:08,509] data_monitor INFO: job [demo_single_value_with_sql_in_file] config OK.
+[2019-05-24 18:03:08,523] data_monitor INFO: job [demo_diff_table] config OK.
+[2019-05-24 18:03:08,534] data_monitor INFO: job [demo_single_value] config OK.
+[2019-05-24 18:03:08,546] data_monitor.config INFO: skiped inactive job "demo_hourly_job"
+[2019-05-24 18:03:08,561] data_monitor.config INFO: skiped inactive job "demo_single_table_history"
+[2019-05-24 18:03:08,577] data_monitor INFO: job [demo_diff_value] config OK.
+[2019-05-24 18:03:08,588] data_monitor INFO: job [demo_single_table] config OK.
+[2019-05-24 18:03:08,589] data_monitor INFO: all job configs OK.
+[2019-05-24 18:03:08,589] data_monitor INFO: monitor start ...
+[2019-05-24 18:03:08,589] data_monitor INFO: ============================================================
+[2019-05-24 18:03:08,589] data_monitor INFO: ****** total jobs: 5 ...
+[2019-05-24 18:03:08,589] data_monitor INFO: ****** pending: 5, running: 0, completed: 0 ******
+[2019-05-24 18:03:08,590] data_monitor INFO: job [demo_diff_table] is due. launched.
+[2019-05-24 18:03:08,595] data_monitor INFO: ****** pending: 4, running: 1, completed: 0 ******
+[2019-05-24 18:03:08,596] data_monitor INFO: job [demo_single_table] is due. launched.
+[2019-05-24 18:03:08,597] data_monitor INFO: ****** pending: 3, running: 2, completed: 0 ******
+[2019-05-24 18:03:08,598] data_monitor INFO: job [demo_single_value] is due. launched.
+[2019-05-24 18:03:08,599] data_monitor INFO: ****** pending: 2, running: 3, completed: 0 ******
+[2019-05-24 18:03:08,599] data_monitor INFO: job [demo_single_value_with_sql_in_file] is due. launched.
+[2019-05-24 18:03:08,601] data_monitor INFO: ****** pending: 1, running: 4, completed: 0 ******
+[2019-05-24 18:03:08,601] data_monitor INFO: job [demo_diff_value] is due. launched.
+[2019-05-24 18:03:08,815] data_monitor INFO: job [demo_single_value] returned. status: =====> ALARM <=====
+    🙏
+    监控描述：演示-单值监控
+    作业名称：demo_single_value
+    发起时间：2019-05-24 09:00:00
+    ====================
+    报警原因：数据校验未通过
+    --------------------
+    校验表达式：`result > 60`
+    查询结果`result`：`50L`
+[2019-05-24 18:03:08,898] requests.packages.urllib3.connectionpool INFO: Starting new HTTP connection (1): xp2.im.baidu.com
+[2019-05-24 18:03:08,943] data_monitor.alarm INFO: succeeded sending BaiduHi message to user "zhuhe02_02"
+[2019-05-24 18:03:08,984] data_monitor INFO: job [demo_single_table] returned. status: OK.
+[2019-05-24 18:03:08,985] data_monitor INFO: job [demo_single_value_with_sql_in_file] returned. status: OK.
+[2019-05-24 18:03:08,985] data_monitor INFO: job [demo_diff_value] returned. status: OK.
+[2019-05-24 18:03:08,985] data_monitor INFO: job [demo_diff_table] returned. status: OK.
+[2019-05-24 18:03:08,985] data_monitor INFO: ****** pending: 0, running: 0, completed: 5 ******
+[2019-05-24 18:03:08,985] data_monitor INFO: all jobs (5) finished.
+[2019-05-24 18:03:08,985] data_monitor INFO: ============================================================
+[2019-05-24 18:03:08,985] data_monitor INFO: monitor exit.
 ```
 
 ## 5. 更多配置示例
@@ -304,14 +318,15 @@ optional arguments:
 
 ```ini
 [demo_single_value]
-desc = 演示作业-单值监控
+; 单值监控
+desc = 演示-单值监控
 due_time = {BASETIME | dt_set(hour=9)}
 db_conf = palo_muse
 sql =
     SELECT count(1)
     FROM pmc_all_channel_advertising
     WHERE event_day = '%(YESTERDAY)s'
-validator = result > 50
+validator = result > 60
 alarm_hi = zhuhe02_02
 alarm_email = zhuhe02
 ```
@@ -319,25 +334,27 @@ alarm_email = zhuhe02
 如果校验失败，将发出类似下面的警报：
 
 ```
-🙏 演示作业-单值监控
-job: demo_single_value
-due time: 2019-05-17 09:00:00
+🙏
+监控描述：演示-单值监控
+作业名称：demo_single_value
+发起时间：2019-05-24 09:00:00
 ====================
-reason: validator not pass
+报警原因：数据校验未通过
 --------------------
-validator is: `result > 50`
-with `result` as: `47L`
+校验表达式：`result > 60`
+查询结果`result`：`50L`
 ```
 
 ### 单表监控
 
 ```ini
 [demo_single_table]
-desc = 演示作业-单表监控
+; 单表监控
+desc = 演示-单表监控
 due_time = {BASETIME | dt_set(hour=9)}
 db_conf = palo_muse
 sql =
-    SELECT event_day, count(1)
+    SELECT event_day, count(*) AS num
     FROM pmc_all_channel_advertising
     WHERE event_day >= '{BASETIME | dt_add(months=-1)}'
     GROUP BY event_day
@@ -356,25 +373,27 @@ alarm_email = zhuhe02
 如果校验失败，将发出类似下面的警报：
 
 ```
-🙏 演示作业-单表监控
-job: demo_single_table
-due time: 2019-05-17 09:00:00
+🙏
+监控描述：演示-单表监控
+作业名称：demo_single_table
+发起时间：2019-05-24 09:00:00
 ====================
-reason: claim failed for some records
-validator is: `claim(result, gt(50))`
+报警原因：数据缺失或不符合要求
+校验表达式：`claim(result, gt(50), period="day")`
 --------------------
-     event_day  col1
-0   2019-04-23    49
-1   2019-04-24    49
-2   2019-04-25    48
-3   2019-04-26    49
-4   2019-04-27    45
-..         ...   ...
-19  2019-05-12    49
-20  2019-05-13    48
-21  2019-05-14    47
-22  2019-05-15    39
-23  2019-05-16    47
+不合格的数据：
+     event_day  num has_data
+0   2019-04-24   49      Yes
+1   2019-04-25   48      Yes
+2   2019-04-26   49      Yes
+3   2019-04-27   45      Yes
+4   2019-04-28   49      Yes
+..         ...  ...      ...
+25  2019-05-19   47      Yes
+26  2019-05-20   39      Yes
+27  2019-05-21   48      Yes
+28  2019-05-22   50      Yes
+29  2019-05-23   50      Yes
 ```
 
 #### 谓词函数的组合
@@ -389,41 +408,154 @@ validator = claim(result, ands(gt(50), lt(60), ne(55)))
 validator = claim(result, ors(ands(gt(50), lt(60), ne(55)), eq(0)))
 ```
 
-### 单值 diff
+### 单表历史监控
+
+在前一个示例中，通过 `claim` 校验函数，我们可以监控查询结果中所有不满足条件的行，但却无法监控缺失的行。例如某一天的数据缺失，由于查询结果终不存在该日期的数据，因此根本不会触发谓词函数，也就无法被监控到。
+
+为了应对这种需求，`claim` 函数提供了以下几个额外的参数，用于监控连续序列终是否有缺失：
+
+- serial: 是否要开启连续序列监控，默认开启，一般不必设置。
+- period: 连续序列的周期，可以枚举以下几个值：year, month, week, day, hour，默认为 day。
+- start: 连续序列的起始时间（包含），datetime 类型。如果不提供，则取 data 中检测到的最小 datetime。
+- end: 连续序列的结束时间（包含），datetime 类型。如果不提供，则取 data 中检测到的最大 datetime。
+
+当连续序列监控开启时，`claim` 会假定查询结果的第一列为要监控的连续序列，比如 `event_day`、`event_month` 等，一旦连续序列中间有空缺，将会触发“缺数”报警。示例如下：
 
 ```ini
-[demo_diff_value]
-desc = 演示作业-单值 diff
+[demo_single_table_history]
+; 单表历史数据监控
+desc = 演示-单表历史数据监控
 due_time = {BASETIME | dt_set(hour=9)}
-db_conf = palo_muse, palo_muse_new
-_sql =
-    SELECT count(1)
+db_conf = palo_muse
+sql =
+    SELECT event_day
     FROM pmc_all_channel_advertising
-    WHERE event_day = '%(YESTERDAY)s'
-sql = %(_sql)s :: %(_sql)s
-validator = abs(result[0] - result[1]) < 1
+    WHERE 
+        event_day >= '{BASETIME | dt_add(months=-1)}'
+        ; 为了发出报警故意漏选了某些时间……
+        AND NOT substr(event_day, 9, 2) IN ('16', '25')
+    GROUP BY event_day
+    ORDER BY event_day
+validator = claim(result, period='day', start='{BASETIME | dt_add(months=-1)}', end='%(YESTERDAY)s')
 alarm_hi = zhuhe02_02
 alarm_email = zhuhe02
 ```
 
-如果校验失败，将发出类似下面的警报：
+该作业实现的功能是：监控一个月内的历史数据，如果有任何一天缺数，则报警。
+
+报警信息如下：
 
 ```
-🙏 演示作业-单值 diff
-job: demo_simple_diff
-due time: 2019-05-14 09:00:00
+🙏
+监控描述：演示-单表历史数据监控
+作业名称：demo_single_table_history
+发起时间：2019-05-24 09:00:00
 ====================
-reason: validator not pass
+报警原因：数据缺失或不符合要求
+校验表达式：`claim(result, period='day', start='2019-04-24 00:00:00', end='20190523')`
 --------------------
-validator is: `abs(result[0] - result[1]) < 1`
-with `result` as: `[47L, 48L]`
+不合格的数据：
+    event_day  num has_data
+0  2019-04-25  NaN       缺数
+1  2019-05-16  NaN       缺数
+```
+
+历史监控不仅可以监控缺数，也可以同时添加谓词条件，报警信息中会同时列出缺数和不满足条件的记录。例如，在上例中的校验表达式中添加谓词函数 `gt(40)`：
+
+```ini
+[demo_single_table_history]
+; 单表历史数据监控
+desc = 演示-单表历史数据监控
+due_time = {BASETIME | dt_set(hour=9)}
+db_conf = palo_muse
+sql =
+    ; 这里 SELECT 选择了两列，因为要对第二列做谓词判断
+    SELECT event_day, count(*) AS num
+    FROM pmc_all_channel_advertising
+    WHERE event_day >= '{BASETIME | dt_add(months=-1)}'
+        ; 为了发出报警故意漏选了某些时间……
+        AND NOT substr(event_day, 9, 2) IN ('16', '25')
+    GROUP BY event_day
+    ORDER BY event_day
+validator = claim(result, gt(40), period='day', start='{BASETIME | dt_add(months=-1)}', end='%(YESTERDAY)s')
+alarm_hi = zhuhe02_02
+alarm_email = zhuhe02
+```
+
+该作业实现的功能是：监控一个月内的历史数据，如果有任何一天缺数、或数据条数不大于40，则报警。
+
+报警信息如下：
+
+```
+🙏
+监控描述：演示-单表历史数据监控
+作业名称：demo_single_table_history
+发起时间：2019-05-24 09:00:00
+====================
+报警原因：数据缺失或不符合要求
+校验表达式：`claim(result, gt(40), period='day', start='2019-04-24 00:00:00', end='20190523')`
+--------------------
+不合格的数据：
+    event_day   num has_data
+0  2019-04-25   NaN       缺数
+1  2019-05-06  35.0      Yes
+2  2019-05-15  39.0      Yes
+3  2019-05-16   NaN       缺数
+4  2019-05-20  39.0      Yes
+```
+
+#### 小时粒度的历史数据监控
+
+如果要监控小时粒度的历史数据是否缺失，需要费一些周折，因为“小时粒度”隐含着“天粒度”，任意一天的任意一小数缺数都不能通过。然而，`claim` 函数只会假定查询结果的第一列为要监控的连续序列，因此我们需要把“日期”和“小时”组合到一起作为一列（可以借助 SQL 中的 `concat` 函数），详见如下示例：
+
+```ini
+[demo_single_table_history_hourly]
+; 小时粒度数据的历史监控（注意：并不是监控周期为小时级，而是所监控数据的粒度为小时级！）
+desc = 演示-单表历史数据监控-小时粒度
+due_time = {BASETIME | dt_set(hour=9)}
+db_conf = mysql
+sql =
+    ; 注意 SELECT 的第一个字段，必须是“日期”和“小时”的组合
+    SELECT concat(stat_date, ' ', stat_hour) AS stat_hour, count(*) AS num
+    FROM ud_al_ps_insight_hour_province
+    WHERE
+        stat_date >= {BASETIME | dt_add(days=-3) | dt_format('%%Y%%m%%d')}
+        ; 为了发出报警故意漏选了某些时间……
+        AND stat_hour != '16'
+    GROUP BY stat_date, stat_hour
+    ORDER BY stat_hour
+; 注意：claim 的参数 period 设为 'hour'
+validator = claim(result, period='hour', start='{BASETIME | dt_add(days=-3)}', end='{DUETIME | dt_add(hours=-6)}')
+alarm_hi = zhuhe02_02
+alarm_email = zhuhe02
+```
+
+该作业实现的功能是：监控 3 天以内的历史数据，如果有任意一个小时缺数，则报警。
+
+报警信息如下：
+
+```
+🙏
+监控描述：演示-单表历史数据监控-小时粒度
+作业名称：demo_single_table_history_hourly
+发起时间：2019-05-24 09:00:00
+====================
+报警原因：数据缺失或不符合要求
+校验表达式：`claim(result, period='hour', start='2019-05-21 00:00:00', end='2019-05-24 03:00:00')`
+--------------------
+不合格的数据：
+       stat_hour  num has_data
+0  2019-05-21 16  NaN       缺数
+1  2019-05-22 16  NaN       缺数
+2  2019-05-23 16  NaN       缺数
 ```
 
 ### 两表 diff
 
 ```ini
 [demo_diff_table]
-desc = 演示作业-两表 diff
+; 两表 diff
+desc = 演示-两表 diff
 due_time = {BASETIME | dt_set(hour=9)}
 db_conf = palo_muse, palo_muse_new
 sql =
@@ -436,7 +568,7 @@ sql =
     FROM pmc_all_channel_advertising
     WHERE event_day = '%(YESTERDAY)s'
     GROUP BY event_day, product, partner
-validator = diff(result[0], result[1], threshold=1)
+validator = diff(result[0], result[1], threshold=-1)
 alarm_hi = zhuhe02_02
 alarm_email = zhuhe02
 ```
@@ -446,31 +578,27 @@ alarm_email = zhuhe02
 其中，`diff(result[0], result[1], threshold=1)` 的含义是对 `result[0]` 和 `result[1]` 做 diff，如果 diff 的绝对值超过 `threshold`，则发出警报。警报信息中会给出所有不满足条件的行，示例如下：
 
 ```
-🙏 演示作业-两表 diff
-job: demo_two_table_diff
-due time: 2019-05-14 09:00:00
+🙏
+监控描述：演示-两表 diff
+作业名称：demo_diff_table
+发起时间：2019-05-24 09:00:00
 ====================
-reason: find diff
-validator is: `diff(result[0], result[1], threshold=1)`
+报警原因：数据diff超出阈值
+校验表达式：`diff(result[0], result[1], threshold=-1)`
 --------------------
-             product        partner    num_1   num_2    diff
-0             haokan  guangdiantong  1134984  518837  616147
-1   baiduboxapp_lite    yingyongbao        0   25357   25357
-2            quanmin         xiaomi        0    3560    3560
-3            quanmin    yingyongbao        0   11321   11321
-4             haokan         xiaomi   847320  449064  398256
-5             haokan           oppo   177334  189478   12144
-6   baiduboxapp_lite           oppo        0   46637   46637
-7        baiduboxapp         xiaomi        0   42740   42740
-8            quanmin           oppo        0      66      66
-9             haokan           vivo   502760  199748  303012
-10  baiduboxapp_lite         xiaomi    42705   50605    7900
-11       baiduboxapp           oppo        0   77691   77691
-12            haokan          meizu    76183   38706   37477
-13            haokan         liebao    15763       0   15763
-14       baiduboxapp    yingyongbao        0   68564   68564
-15            haokan    yingyongbao        0   67475   67475
-16       baiduboxapp          meizu    14744   12701    2043
+不合格的数据：
+     event_day           product        partner   num_1   num_2  diff
+0   2019-05-23            haokan           vivo  672798  672798     0
+1   2019-05-23  baiduboxapp_lite    yingyongbao       0       0     0
+2   2019-05-23  baiduboxapp_lite           oppo       0       0     0
+3   2019-05-23            haokan  guangdiantong  966881  966881     0
+4   2019-05-23       baiduboxapp          meizu   10760   10760     0
+..         ...               ...            ...     ...     ...   ...
+12  2019-05-23            haokan          meizu   74393   74393     0
+13  2019-05-23           quanmin         xiaomi       0       0     0
+14  2019-05-23       baiduboxapp    yingyongbao       0       0     0
+15  2019-05-23  baiduboxapp_lite         xiaomi   35858   35858     0
+16  2019-05-23           quanmin    yingyongbao       0       0     0
 ```
 
 `diff` 函数还可以接受一个额外的参数 `direction` 用于指定 diff 的方向，其取值为 `-1`、`0`、`1`，分别代表左表减右表、两表相减取绝对值、右表减左表，默认值为 `0`。
@@ -480,7 +608,7 @@ validator is: `diff(result[0], result[1], threshold=1)`
 ```ini
 [demo_hourly_job]
 ; 小时级监控
-desc = 演示作业-小时级监控
+desc = 演示-小时级监控
 period = hour
 due_time = {BASETIME | dt_set(hour=6)}
 db_conf = mysql
@@ -502,7 +630,7 @@ alarm_email = zhuhe02
 
 - 需要在配置中明确指定 `period = hour`。
 - 程序会在配置加载完成后，将每个小时级任务复制成 24 份，它们的 `due_time` 分别为初始 `due_time` 加上 0~23 小时，名称为原始名称加上小时后缀，以便报警时区分。
-- 小时级任务除了 `BASETIME` 以外，还有一个特有的环境变量 `DUETIME`，表示作业被调起的时间。这样用户的 sql 就可以关联到作业的调起时间，比如“每个小时检查 6 小时之前的数据是否就绪”。
+- 小时级任务的 `sql` 中，一般要使用 `DUETIME` 环境变量，而不是 `BASETIME`。这样用户的 sql 就可以关联到作业的调起时间，比如“每个小时检查 6 小时之前的数据是否就绪”。
 
 执行小时级的任务，打印的日志也会体现出 24 个作业：
 

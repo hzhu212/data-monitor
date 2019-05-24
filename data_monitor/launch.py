@@ -144,7 +144,7 @@ def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interva
                     sleep_time = poll_interval
                     if len(fs) == 0:
                         sleep_time = (due_time - now).total_seconds()
-                        logger.info('sleeping until the most recent job [{}] due ({}) ...'.format(job['_name'], due_time))
+                        logger.info('sleeping until the most recent job [{}] due at ({}) ...'.format(job['_name'], due_time))
                     time.sleep(sleep_time)
 
             # 收集并处理执行完成的 job

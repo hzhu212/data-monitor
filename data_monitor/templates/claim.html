@@ -13,17 +13,18 @@
     </style>
 </head>
 <body>
-    <h1>job {job[_name]}</h1>
-    <p>description: {job[desc]}</p>
-    <p>due time {job[due_time]}</p1>
+    <h2>🙏 监控描述：{job[desc]}</h2>
+    <p>作业名称：{job[_name]}</p>
+    <p>发起时间：{job[due_time]}</p1>
     <hr/>
 
-    <h2>reason: claim failed for some records</h2>
-    <p>validator is: <code>{job[validator]}</code></p>
+    <h2>报警原因：数据缺失或不符合要求</h2>
+    <p>校验表达式：<code>{job[validator]}</code></p>
+    <p>不合格的数据：</p>
     {content}
     <hr/>
 
-    <p><b>sql</b> is: <div class="code" style="margin-left: 2em"><code>{sql}</code></div></p>
-    <p>with <code>db_conf</code>(s) as: <code>{database}</code></p>
+    <p><b>sql</b>：<div class="code" style="margin-left: 2em"><code>{sql}</code></div></p>
+    <p><code>db_conf</code>(s)：<code>{database}</code></p>
 </body>
 </html>

@@ -196,14 +196,14 @@ def _check_out_job_config(job_conf, db_configs):
     except:
         pass
 
-    # 对于历史数据监控（基于 claim 校验函数），如果用户未显式设置周期参数，则使用 period 选项填充
-    # 例如：'claim(result, gt(30))' --> 'claim(result, gt(30), period="day")'
-    if re.search(r'\bclaim\s*\(', job_conf['validator']):
-        if 'period' not in job_conf['validator']:
-            job_conf['validator'] = re.sub(
-                r'(\bclaim\s*)\((.*)\)',
-                r'\1(\2, period="{}")'.format(job_conf['period']),
-                job_conf['validator'])
+    # # 对于历史数据监控（基于 claim 校验函数），如果用户未显式设置周期参数，则使用 period 选项填充
+    # # 例如：'claim(result, gt(30))' --> 'claim(result, gt(30), period="day")'
+    # if re.search(r'\bclaim\s*\(', job_conf['validator']):
+    #     if 'period' not in job_conf['validator']:
+    #         job_conf['validator'] = re.sub(
+    #             r'(\bclaim\s*)\((.*)\)',
+    #             r'\1(\2, period="{}")'.format(job_conf['period']),
+    #             job_conf['validator'])
 
     # 从 db_configs 中取出对应的 db_conf 替换 db_conf 字段
     for i, name in enumerate(job_conf['db_conf']):
@@ -267,8 +267,8 @@ def render_depending_job_conf(job_conf):
 
     env.globals = dict(DUETIME=job_conf['due_time'])
 
-    # 目前仅 sql 选项为依赖性渲染，后期可能增加别的选项
-    for op in ('sql', ):
+    # 目前仅 sql, validator 选项为依赖性渲染，后期可能增加别的选项
+    for op in ('sql', 'validator'):
         if isinstance(job_conf[op], (list, tuple)):
             sep = '\x01'
             job_conf[op] = env.from_string(sep.join(job_conf[op])).render().split(sep)
@@ -337,7 +337,7 @@ def get_job_conf_list(db_config_file, job_config_files, job_names):
             if job_conf['due_time'].date() != today:
                 logger.info('skiped unscheduled job: [{}] at {}'.format(job_name, job_conf['due_time']))
                 continue
-            yield job_conf
+            yield render_depending_job_conf(job_conf)
 
         # 小时级作业复制成 24 份
         else:

@@ -31,17 +31,17 @@ def format_baidu_hi(job, info):
     # 配置错误警报。由于任何配置项都可能缺失，因此要保证最精简的提示信息（只包括 job name）
     if type_ == 'config_error':
         msg = [
-            'job: {}'.format(job['_name']),
+            '作业名称：{}'.format(job['_name']),
             '=' * 20,
-            'reason: job config error',
+            '报警原因：作业配置错误',
             '-' * 20,
             str(content), ]
         return '\n'.join(msg)
 
     msg = [
-        '🙏 {}'.format(job['desc']),
-        'job: {}'.format(job['_name']),
-        'due time: {}'.format(job['due_time']),
+        '🙏\n监控描述：{}'.format(job['desc']),
+        '作业名称：{}'.format(job['_name']),
+        '发起时间：{}'.format(job['due_time']),
         '=' * 20, ]
 
     if type_ == 'claim':
@@ -51,9 +51,10 @@ def format_baidu_hi(job, info):
         except:
             content_s = str(content)
         msg += [
-            'reason: claim failed for some records',
-            'validator is: `{}`'.format(job['validator'].encode('utf8')),
+            '报警原因：数据缺失或不符合要求',
+            '校验表达式：`{}`'.format(job['validator'].encode('utf8')),
             '-' * 20,
+            '不合格的数据：',
             content_s,]
 
     elif type_ == 'diff':
@@ -63,25 +64,26 @@ def format_baidu_hi(job, info):
         except:
             content_s = str(content)
         msg += [
-            'reason: find diff',
-            'validator is: `{}`'.format(job['validator'].encode('utf8')),
+            '报警原因：数据diff超出阈值',
+            '校验表达式：`{}`'.format(job['validator'].encode('utf8')),
             '-' * 20,
+            '不合格的数据：',
             content_s,]
 
     elif type_ == 'exception':
         # exception 类型对应的 content 为一个字符串，包含错误堆栈
         msg += [
-            'reason: job raised an exception',
+            '报警原因：作业抛出异常',
             '-' * 20,
             content, ]
 
     else:
         # 默认消息类型对应的 content 为 sql 查询结果
         msg += [
-            'reason: validator not pass',
+            '报警原因：数据校验未通过',
             '-' * 20,
-            'validator is: `{}`'.format(job['validator'].encode('utf8')),
-            'with `result` as: `{}`'.format(repr(content)),]
+            '校验表达式：`{}`'.format(job['validator'].encode('utf8')),
+            '查询结果`result`：`{}`'.format(repr(content)),]
 
     msg = '\n'.join(msg)
     return msg
