@@ -101,7 +101,7 @@ def _check_out_job_config(job_conf, db_configs):
 
     # 检查枚举类型配置项
     enums = {
-        'period': ('day_and_above', 'hour'),
+        'period': ('year', 'month', 'week', 'day', 'hour'),
         'is_active': ('true', 'false'),
     }
     for k, scope in enums.items():
@@ -195,6 +195,15 @@ def _check_out_job_config(job_conf, db_configs):
         raise ConfigError('error in option "validator", traceback is: \n{}'.format(tb))
     except:
         pass
+
+    # 对于历史数据监控（基于 claim 校验函数），如果用户未显式设置周期参数，则使用 period 选项填充
+    # 例如：'claim(result, gt(30))' --> 'claim(result, gt(30), period="day")'
+    if re.search(r'\bclaim\s*\(', job_conf['validator']):
+        if 'period' not in job_conf['validator']:
+            job_conf['validator'] = re.sub(
+                r'(\bclaim\s*)\((.*)\)',
+                r'\1(\2, period="{}")'.format(job_conf['period']),
+                job_conf['validator'])
 
     # 从 db_configs 中取出对应的 db_conf 替换 db_conf 字段
     for i, name in enumerate(job_conf['db_conf']):
@@ -322,7 +331,7 @@ def get_job_conf_list(db_config_file, job_config_files, job_names):
             continue
 
         # 天级以上作业
-        if job_conf['period'] == 'day_and_above':
+        if job_conf['period'] != 'hour':
             # 如果 due_time 不是当天则跳过
             today = datetime.date.today()
             if job_conf['due_time'].date() != today:
@@ -331,7 +340,7 @@ def get_job_conf_list(db_config_file, job_config_files, job_names):
             yield job_conf
 
         # 小时级作业复制成 24 份
-        elif job_conf['period'] == 'hour':
+        else:
             one_hour = datetime.timedelta(hours=1)
             for i in range(24):
                 due_time = job_conf['due_time'] + i * one_hour
@@ -339,6 +348,3 @@ def get_job_conf_list(db_config_file, job_config_files, job_names):
                 name = job_conf['_name'] + '_hour' + due_time.strftime('%H')
                 new_job_conf = dict(job_conf, due_time=due_time, _name=name)
                 yield render_depending_job_conf(new_job_conf)
-
-        else:
-            pass

@@ -100,7 +100,7 @@ sql =       ; 必填。查询数据所调用的 SQL 语句，如果语句过长�
             ; db_conf，database 以及 sql 如果包含多个值，那么值的数量必须相一致。
 
 validator = ; 必填。校验表达式，一个合法的 Python 表达式，用于判定查询结果是否会触发报警。
-			; 返回值为一个布尔值，如果为 `False` 说明校验失败，将触发报警，程序会根据作业配置
+            ; 返回值为一个布尔值，如果为 `False` 说明校验失败，将触发报警，程序会根据作业配置
             ; 自动生成报警原因。如果需要更细节的报警原因，可提供第二个返回值 `info` 作为定制信息。
             ; 校验表达式的核心基础在于它可以通过钩子变量 `result` 来引用 SQL 的返回结果：
             ; 如果 SQL 的查询结果是单个值（比如查询数据行数），那么 `result` 就是该值；
@@ -113,15 +113,15 @@ validator = ; 必填。校验表达式，一个合法的 Python 表达式，用�
             ; 用户调用 `os.system('rm -rf /')`。因此我们对校验表达式的上下文环境进行了一定的限制，
             ; 使得用户只能调用 float, min, max, sum, map 等安全的方法。
             ; 同时该上下文环境支持自由扩展，用户可以在其中使用任意自定义函数，只需要把想调用的函数
-            ; 使用 `context.register_validator` 装饰器装饰即可。`data_monitor/user/validators.py` 
+            ; 使用 `context.register_validator` 装饰器装饰即可。`data_monitor/user/validators.py`
             ; 文件中已经定义了一些常用的 validator 函数，可供参考。
             ; 如果你的校验逻辑比较复杂，那么推荐你定义自己的 validator 函数。
 
 alarm_hi =  ; 必填。报警接收人的百度Hi账号，多个值以半角逗号分隔。
 alarm_email=; 必填。报警接收人的百度邮箱或百度ID，多个值以半角逗号分隔。
 
-period =    ; 可选。监控周期，可取的值有：day_and_above, hour，分别代表天级及以上监控、小时级监控。
-			; 默认为 day_and_above，一般监控作业无需指定该参数。
+period =    ; 可选。所监控数据的产出周期，可取的值有：year, month, week, day, hour。
+            ; 默认为 day，一般监控作业无需指定该参数。
 
 is_active = ; 可选。是否激活该监控，可取的值为：true, false。未激活的配置会跳过。可用于禁用某些监控作业。
 
@@ -133,7 +133,7 @@ retry_interval = ; 每次重试的间隔，默认为 01:00:00，即一小时后�
 
 ```ini
 [DEFAULT]
-period = day_and_above
+period = day
 is_active = true
 retry_times = 0
 retry_interval = 01:00:00

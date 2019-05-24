@@ -78,7 +78,7 @@ def run_job(job):
     try:
         ret = eval(job['validator'], {'__builtins__': {}}, context)
     except Exception as e:
-        raise ValidatorError('your validator {!r} raised an exception: \n\t{!r}'.format(job['validator'], e))
+        raise ValidatorError('your validator {!r} raised an exception: \n{}'.format(job['validator'], traceback.format_exc()))
 
     try:
         # 如果用户 validator 中同时返回了 ok 和 info，则直接使用
