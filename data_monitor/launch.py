@@ -217,6 +217,8 @@ def execute(default_db_config_file, default_job_config_file):
             raise ValueError('database config file "{}" not exists'.format(args.db_config_file))
         db_config_file = args.db_config_file
     else:
+        if not os.path.isfile(default_db_config_file):
+            raise ValueError('default database config file "{}" not exist'.format(default_db_config_file))
         db_config_file = default_db_config_file
 
     if args.job_config_files:
@@ -229,6 +231,8 @@ def execute(default_db_config_file, default_job_config_file):
                 if os.path.isfile(file):
                     job_config_files.append(file)
     else:
+        if not os.path.isfile(default_job_config_file):
+            raise ValueError('default job config file "{}" not exist'.format(default_job_config_file))
         job_config_files = [default_job_config_file]
 
     if args.force and not args.job_names:
