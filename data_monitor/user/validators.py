@@ -70,7 +70,7 @@ def claim(data, pred=None, serial=True, period='day', start=None, end=None):
     index = df['has_data'].isna()
     if pred is not None:
         index = index | (~df[col_names[-1]].apply(pred))
-    res = df.loc[index, :]
+    res = df.loc[index, :].copy()
 
     if len(res.index) == 0:
         return True
@@ -118,7 +118,8 @@ def _sequenced(df, serial_col, period, start, end):
 
     def gen_sequence(start, end, period):
         """根据起止时间和周期，产生完整的日期时间序列"""
-        delta = eval('dateutil.relativedelta.relativedelta({}s=1)'.format(period))
+        params = {period + 's': 1}
+        delta = dateutil.relativedelta.relativedelta(**params)
         while start <= end:
             yield start
             start = start + delta
