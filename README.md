@@ -177,7 +177,7 @@ alarm_email = zhuhe02
 - `due_time`：
 	+ 花括号代表该内容块需要动态渲染（针对简单的模板渲染，一般可采用 Python 的 `str.format` 函数，但此处需要支持管道过滤器操作，因此采用了更高级的 [jinja2](http://docs.jinkan.org/docs/jinja2/) 包做渲染）。
 	+ `| dt_set(hour=9, mimute=30)` 是一个管道操作（在 jinja2 中称为过滤），其作用是把管道符之前的值（`BASETIME`）通过函数处理一下，得到一个新的值。其中，`dt_set`（set datetime）是一个过滤器，用于计算绝对日期时间。整个表达式 `BASETIME | dt_set(hour=9, mimute=30)` 的含义就是把 `BASETIME` 的小时数设为 `9`，分钟数设为 `30`，得到一个新的时间，即 `BASETIME` 当天的 09:30。
-	+ 过滤器函数可由用户自由定制，目前已实现的过滤器包括 `dt_set`、`dt_add`、`dt_format`，分别用于生成绝对时间、相对时间、格式化时间字符串。你可以在 `data_monitor/user/filters.py` 中查看它们的定义。如果这些过滤器不能满足你的需求，欢迎定义自己的过滤器。
+	+ 过滤器函数可由用户自由定制，目前已实现的过滤器包括 `dt_set`、`dt_add`、`dt_format`，分别用于生成绝对时间、相对时间、格式化时间字符串，详细用法参见【过滤器函数用法详解】。你可以在 `data_monitor/user/filters.py` 中查看它们的定义。
 
 - `sql`：
 	+ 前半部分容易理解，就是一个普通的 SQL 查询语句。
@@ -199,6 +199,55 @@ alarm_email = zhuhe02
 校验表达式：`result > 60`
 查询结果`result`：`50L`
 ```
+
+### 过滤器函数用法详解
+
+#### `dt_set`
+
+设置 datetime 的绝对量。
+
+调用形式为： `dt_set(year, month, weekday, day, hour, minute, second, microsecond)`，所有参数均可缺省，每个参数均可单独设定。
+
+**但需要注意，`weekday` 不能与 `year`、`month`、`day` 同时设定，因为可能会出现矛盾，可以使用两次过滤器分别设定，以避免矛盾**。
+
+示例：
+
+- `{BASETIME | dt_set(day=15)}`: BASETIME 所在月的15号
+- `{BASETIME | dt_set(day=15, hour=9, minite=30, second=10)}`: BASETIME 所在月的15号的 09:30:10
+- `{BASETIME | dt_set(month=10, day=1)}`: BASETIME 所在年份的10月1号
+- `{BASETIME | dt_set(month=10, day=1) | dt_set(weekday=5)}`: BASETIME 所在年份的10月1号所在周的周五
+
+#### `dt_add`
+
+设置 datetime 偏移量。
+
+调用形式为 `dt_add(years, months, weeks, days, hours, minutes, seconds, microseconds)`，所有参数均可缺省，每个参数均可单独设定。
+
+示例：
+
+- `{BASETIME | dt_add(days=-3)}`：BASETIME 三天前的同一时间
+- `{BASETIME | dt_add(hours=9, minutes=30, seconds=10)}`：BASETIME 9小时30分钟10秒之后的时间
+- `{BASETIME | dt_add(years=-1, months=-3)`：BASETIME 一年零三个月前的同一时间
+- `{BASETIME | dt_add(weeks=-3)}`：BASETIME 三周前的同一时间
+
+注意：`dt_add` 的 `months` 参数是指自然月。增减月份时，不管当月包含多少天，总是会保持增减后的日期与当前一致。例如 `2019-03-01` 前推1个月是 `2019-02-01`，前推2个月是 `2019-01-01`，这是符合直觉的。
+
+当增减后的日期越界时，会截断到最大的非越界日期，例如：`2019-03-31` 前推1个月是 `2019-02-28`，而不是 `2019-02-31`，因为2019年2月不存在 29、30、31 号；基于这个原因，`2019-03-30`、`2019-03-29`、`2019-03-28` 前推一个月也都会得到 `2019-02-28`。
+
+这一特性可能会导致粗心的错误，例如：`2019-03-31` 一次性前推2个月是 `2019-01-31`，但如果分作两次，每次分别前推一个月，却会得到 `2019-01-28`。这有点违背算术直觉，但也只能如此实现。避免这个错误的方法是，**尽量不要在月末的日期上做月粒度的增减操作，如果确实需要处理月末，可以先求出下个月的月初，然后减去一天**。
+
+#### `dt_format`
+
+将 datetime 格式化为字符串。调用形式为 `dt_format(fmt='%%Y-%%m-%%d %%H:%%M:%%S')`。该示例为 ISO 8601 格式，即 YYYY-MM-DD HH:MM:SS，如果 datetime 不采用任何格式化操作，默认输出的就是这种形式。可以根据自己的需要，将 datetime 格式化为需要的形式。
+
+#### 组合使用
+
+过滤器函数可以通过管道符串接叠加使用。
+
+示例：
+
+- `{BASETIME | dt_add(days=-3) | dt_set(hour=8, minute=30)}`: BASETIME 三天前的 08:30。
+- `sql = SELECT ... WHERE stat_date = {BASETIME | dt_add(days=-1) | dt_format('%%Y%%m%%d')} AND stat_hour = '{DUETIME | dt_add(hour=-1) | dt_format('%%H')}'`
 
 ## 4. 使用
 
