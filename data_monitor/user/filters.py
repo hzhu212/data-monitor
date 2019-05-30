@@ -54,9 +54,9 @@ def dt_set(dt, **kwargs):
 
 
 @register_filter
-def dt_format(dt, fmt='%Y-%m-%dT%H:%M:%S.%f'):
+def dt_format(dt, fmt='%Y-%m-%d %H:%M:%S'):
     """返回一个 datetime 的格式化字符串。
-    默认使用 ISO 8601 格式：YYYY-MM-DDTHH:MM:SS[.mmmmmm][+HH:MM]。
+    默认使用 ISO 8601 格式：YYYY-MM-DD HH:MM:SS
     """
     if not isinstance(dt, datetime.date):
         dt = dateparser.parse(dt)
