@@ -47,7 +47,7 @@ def get_config(config_file, section_name=None):
     conf = configparser.ConfigParser()
     conf.optionxform = str
 
-    conf.read(config_file)
+    conf.read(config_file, encoding='utf8')
     if section_name is None:
         return {name: dict(conf.items(name)) for name in conf.sections()}
     return dict(conf.items(section_name))
