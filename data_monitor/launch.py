@@ -252,7 +252,7 @@ def execute(default_db_config_file, default_job_config_file):
 
 
     # 主程序开始前，绑定中断信号，使得程序可以随时中断。
-    for sig in ('TERM', 'HUP', 'INT'):
-        signal.signal(getattr(signal, 'SIG'+sig), quit)
+    for sig in ('HUP', 'INT', 'QUIT', 'TERM'):
+        signal.signal(getattr(signal, 'SIG' + sig), quit)
 
     main(db_config_file, job_config_files, args.job_names)
