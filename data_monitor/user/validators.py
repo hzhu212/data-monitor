@@ -40,10 +40,12 @@ def claim(data, pred=None, serial=True, period='day', start=None, end=None):
     当监控连续序列开启时，程序会认为 data 的第一列为要监控的序列。
     """
 
-    # 如果 data 是单个值，直接判定
+    # 如果 data 是单个值且设定了谓词函数，直接判定。否则将单个值包装成嵌套列表，按照一般流程处理。
     if not isinstance(data, (tuple, list)):
-        ok = pred(data)
-        return ok
+        if pred is not None:
+            ok = pred(data)
+            return ok
+        data = [[data]]
 
     if len(data) == 0:
         return False, 'result is empty'
