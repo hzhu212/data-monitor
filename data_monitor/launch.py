@@ -12,7 +12,8 @@ import logging
 import os
 import re
 import Queue
-import time
+import signal
+import threading
 import traceback
 
 import pandas as pd
@@ -27,10 +28,18 @@ from .util import AlarmInfo, ValidatorError
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(name)s %(levelname)s: %(message)s')
 logger = logging.getLogger('data_monitor')
 
-
 # 控制台打印表格时，如果行数超过 10，则使用省略号折叠
 pd.set_option('display.max_rows', 10)
 pd.set_option('display.width', 120)
+
+
+# 在多线程的情况下，time.sleep 不能被 Interrupt，程序无法正常中断，只能强制杀死。
+# 因此采用 threading.Event 取代 time.sleep，其好处是可以随时中断。
+exit_waiter = threading.Event()
+
+def quit(signo, _frame):
+    exit_waiter.set()
+    print("Interrupted by signal %d, exit." % signo)
 
 
 def run_job(job):
@@ -145,7 +154,9 @@ def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interva
                     if len(fs) == 0:
                         sleep_time = (due_time - now).total_seconds()
                         logger.info('sleeping until the most recent job [{}] due at ({}) ...'.format(job['_name'], due_time))
-                    time.sleep(sleep_time)
+                    exit_waiter.wait(sleep_time)
+                    if exit_waiter.is_set():
+                        break
 
             # 收集并处理执行完成的 job
             try:
@@ -181,7 +192,6 @@ def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interva
                 pass
 
         logger.info('****** pending: {}, running: {}, completed: {} ******'.format(task_queue.qsize(), len(fs), ncompleted))
-        logger.info('all jobs ({}) finished.'.format(ntotal))
         logger.info('=' * 60)
         logger.info('monitor exit.')
 
@@ -239,5 +249,10 @@ def execute(default_db_config_file, default_job_config_file):
         raise ValueError(
             'job name(s) has to be provided when using `force` mode, otherwise '
             'you may annoy other users by sending a lot of alarm messages!')
+
+
+    # 主程序开始前，绑定中断信号，使得程序可以随时中断。
+    for sig in ('TERM', 'HUP', 'INT'):
+        signal.signal(getattr(signal, 'SIG'+sig), quit)
 
     main(db_config_file, job_config_files, args.job_names)
