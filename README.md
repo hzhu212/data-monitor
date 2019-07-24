@@ -1,16 +1,10 @@
 # 数据监控工具
 
-[TOC]
-
 ## 1. 开发背景
 
-数据监控工具 data-monitor 用于监控数据库内的数据，当数据不符合用户预期时，通过邮件、百度Hi等方式向用户发出警报。
+数据监控工具 data-monitor 用于监控数据库内的数据，当数据不符合用户预期时，通过邮件等方式向用户发出警报。
 
-先前已存在一版监控工具：[旧版监控工具](http://wiki.baidu.com/pages/viewpage.action?pageId=208121386)，但该工具存在难以配置、难以扩展的问题，因此予以重构。
-
-新版监控工具可覆盖旧版工具的所有需求，并着重对可配置性、可扩展性、实时性做了提升。
-
-目前，data-monitor 支持如下两种基本的监控需求：
+data-monitor 支持如下两种基本的监控需求：
 
 **1. 单查询结果集监控**
 
@@ -39,7 +33,7 @@ data-monitor 运行流程如下：
 - 启动主循环：
 	- 轮询任务队列，一旦有任务到期则分发给线程池，多个任务同时到期可并行分发。
 	- 轮询线程池，收集已完成的 job，根据 job 执行结果选择是否报警。
-		- 如果报警，则向报警人发送百度Hi消息和邮件。
+		- 如果报警，则向报警人发送邮件或其他消息。
 		- 报警后，如果 job 设置了重试，则根据重试时间将 job 重新放回作业队列。
 	- 当作业队列为空、且线程池中无正在运行的作业时，退出循环。
 - 程序结束。
@@ -66,12 +60,12 @@ data-monitor 包含两个配置文件：
 每个 section 包含一个数据库的相关配置，section 名称即为该配置组合的名称。以下是一个配置示例：
 
 ```ini
-[palo_gaia_db]              ; 配置组名称，可在 job.cfg 中通过 `db_conf` 字段进行引用。
-host = palo-yqa.baidu.com   ; 数据库 host 地址
-port = 9030                 ; 数据库端口号
-user = gaia_user            ; 数据库用户名
+[mysql_test_db]             ; 配置组名称，可在 job.cfg 中通过 `db_conf` 字段进行引用。
+host = localhost            ; 数据库 host 地址
+port = 3306                 ; 数据库端口号
+user = username             ; 数据库用户名
 passwd = ******             ; 数据库密码
-database = gaia_db          ; 默认使用的数据库名称（USE db）
+database = test_db          ; 默认使用的数据库名称（USE db）
 charset = utf8              ; 数据库编码
 ```
 
@@ -117,8 +111,7 @@ validator = ; 必填。校验表达式，一个合法的 Python 表达式，用�
             ; 文件中已经定义了一些常用的 validator 函数，可供参考。
             ; 如果你的校验逻辑比较复杂，那么推荐你定义自己的 validator 函数。
 
-alarm_hi =  ; 必填。报警接收人的百度Hi账号，多个值以半角逗号分隔。
-alarm_email=; 必填。报警接收人的百度邮箱或百度ID，多个值以半角逗号分隔。
+alarm_email=; 必填。报警接收人的邮箱，多个值以半角逗号分隔。
 
 period =    ; 可选。所监控数据的产出周期，可取的值有：year, month, week, day, hour。
             ; 默认为 day，一般监控作业无需指定该参数。
@@ -162,17 +155,16 @@ YESTERDAY_ISO = {BASETIME | dt_add(days=-1) | dt_format('%%Y-%%m-%%d')}
 ; 单值监控
 desc = 演示-单值监控
 due_time = {BASETIME | dt_set(hour=9, mimute=30)}	; 触发时间为 BASETIME 当天 09:30
-db_conf = palo_muse
+db_conf = mysql_test_db
 sql =
     SELECT count(1)
-    FROM pmc_all_channel_advertising
+    FROM table1
     WHERE event_day = '%(YESTERDAY)s'
 validator = result > 60								; 要求查询结果大于 60，否则发出警报
-alarm_hi = zhuhe02_02
-alarm_email = zhuhe02
+alarm_email = zhuhe212
 ```
 
-其中，`db_conf`、`alarm_hi`、`alarm_email` 的含义显而易见，其余几条配置需要额外说明一下：
+其中，`db_conf`、`alarm_email` 的含义显而易见，其余几条配置需要额外说明一下：
 
 - `due_time`：
 	+ 花括号代表该内容块需要动态渲染（针对简单的模板渲染，一般可采用 Python 的 `str.format` 函数，但此处需要支持管道过滤器操作，因此采用了更高级的 [jinja2](http://docs.jinkan.org/docs/jinja2/) 包做渲染）。
@@ -316,7 +308,7 @@ optional arguments:
 程序开始执行后，会在控制台中打印详细的执行日志，覆盖作业调度、是否报警、异常等各种信息。以下为某次启动 data-monitor 之后的执行日志：
 
 ```
-[2019-05-24 18:03:08,475] data_monitor INFO: using job config file(s): ['/home/work/zhuhe02/workspace/data-monitor/job.cfg']
+[2019-05-24 18:03:08,475] data_monitor INFO: using job config file(s): ['/home/work/zhuhe212/workspace/data-monitor/job.cfg']
 [2019-05-24 18:03:08,475] data_monitor INFO: checking job configs ...
 [2019-05-24 18:03:08,509] data_monitor INFO: job [demo_single_value_with_sql_in_file] config OK.
 [2019-05-24 18:03:08,523] data_monitor INFO: job [demo_diff_table] config OK.
@@ -349,8 +341,6 @@ optional arguments:
     --------------------
     校验表达式：`result > 60`
     查询结果`result`：`50L`
-[2019-05-24 18:03:08,898] requests.packages.urllib3.connectionpool INFO: Starting new HTTP connection (1): xp2.im.baidu.com
-[2019-05-24 18:03:08,943] data_monitor.alarm INFO: succeeded sending BaiduHi message to user "zhuhe02_02"
 [2019-05-24 18:03:08,984] data_monitor INFO: job [demo_single_table] returned. status: OK.
 [2019-05-24 18:03:08,985] data_monitor INFO: job [demo_single_value_with_sql_in_file] returned. status: OK.
 [2019-05-24 18:03:08,985] data_monitor INFO: job [demo_diff_value] returned. status: OK.
@@ -370,14 +360,13 @@ optional arguments:
 ; 单值监控
 desc = 演示-单值监控
 due_time = {BASETIME | dt_set(hour=9)}
-db_conf = palo_muse
+db_conf = mysql_test_db
 sql =
     SELECT count(1)
-    FROM pmc_all_channel_advertising
+    FROM table1
     WHERE event_day = '%(YESTERDAY)s'
 validator = result > 60
-alarm_hi = zhuhe02_02
-alarm_email = zhuhe02
+alarm_email = zhuhe212
 ```
 
 如果校验失败，将发出类似下面的警报：
@@ -401,16 +390,15 @@ alarm_email = zhuhe02
 ; 单表监控
 desc = 演示-单表监控
 due_time = {BASETIME | dt_set(hour=9)}
-db_conf = palo_muse
+db_conf = mysql_test_db
 sql =
     SELECT event_day, count(*) AS num
-    FROM pmc_all_channel_advertising
+    FROM table1
     WHERE event_day >= '{BASETIME | dt_add(months=-1)}'
     GROUP BY event_day
     ORDER BY event_day
 validator = claim(result, gt(50))
-alarm_hi = zhuhe02_02
-alarm_email = zhuhe02
+alarm_email = zhuhe212
 ```
 
 该示例的 `validator` 中使用了自定义校验函数 `claim` 和 `gt`，这些函数定义在 `data_monitor/user/validators.py` 中。其中：
@@ -475,10 +463,10 @@ validator = claim(result, ors(ands(gt(50), lt(60), ne(55)), eq(0)))
 ; 单表历史数据监控
 desc = 演示-单表历史数据监控
 due_time = {BASETIME | dt_set(hour=9)}
-db_conf = palo_muse
+db_conf = mysql_test_db
 sql =
     SELECT event_day
-    FROM pmc_all_channel_advertising
+    FROM table1
     WHERE 
         event_day >= '{BASETIME | dt_add(months=-1)}'
         ; 为了发出报警故意漏选了某些时间……
@@ -486,8 +474,7 @@ sql =
     GROUP BY event_day
     ORDER BY event_day
 validator = claim(result, period='day', start='{BASETIME | dt_add(months=-1)}', end='%(YESTERDAY)s')
-alarm_hi = zhuhe02_02
-alarm_email = zhuhe02
+alarm_email = zhuhe212
 ```
 
 该作业实现的功能是：监控一个月内的历史数据，如果有任何一天缺数，则报警。
@@ -516,19 +503,18 @@ alarm_email = zhuhe02
 ; 单表历史数据监控
 desc = 演示-单表历史数据监控
 due_time = {BASETIME | dt_set(hour=9)}
-db_conf = palo_muse
+db_conf = mysql_test_db
 sql =
     ; 这里 SELECT 选择了两列，因为要对第二列做谓词判断
     SELECT event_day, count(*) AS num
-    FROM pmc_all_channel_advertising
+    FROM table1
     WHERE event_day >= '{BASETIME | dt_add(months=-1)}'
         ; 为了发出报警故意漏选了某些时间……
         AND NOT substr(event_day, 9, 2) IN ('16', '25')
     GROUP BY event_day
     ORDER BY event_day
 validator = claim(result, gt(40), period='day', start='{BASETIME | dt_add(months=-1)}', end='%(YESTERDAY)s')
-alarm_hi = zhuhe02_02
-alarm_email = zhuhe02
+alarm_email = zhuhe212
 ```
 
 该作业实现的功能是：监控一个月内的历史数据，如果有任何一天缺数、或数据条数不大于40，则报警。
@@ -562,11 +548,11 @@ alarm_email = zhuhe02
 ; 小时粒度数据的历史监控（注意：并不是监控周期为小时级，而是所监控数据的粒度为小时级！）
 desc = 演示-单表历史数据监控-小时粒度
 due_time = {BASETIME | dt_set(hour=9)}
-db_conf = mysql
+db_conf = mysql_test_db
 sql =
     ; 注意 SELECT 的第一个字段，必须是“日期”和“小时”的组合
     SELECT concat(stat_date, ' ', stat_hour) AS stat_hour, count(*) AS num
-    FROM ud_al_ps_insight_hour_province
+    FROM table2
     WHERE
         stat_date >= {BASETIME | dt_add(days=-3) | dt_format('%%Y%%m%%d')}
         ; 为了发出报警故意漏选了某些时间……
@@ -575,8 +561,7 @@ sql =
     ORDER BY stat_hour
 ; 注意：claim 的参数 period 设为 'hour'
 validator = claim(result, period='hour', start='{BASETIME | dt_add(days=-3)}', end='{DUETIME | dt_add(hours=-6)}')
-alarm_hi = zhuhe02_02
-alarm_email = zhuhe02
+alarm_email = zhuhe212
 ```
 
 该作业实现的功能是：监控 3 天以内的历史数据，如果有任意一个小时缺数，则报警。
@@ -606,20 +591,19 @@ alarm_email = zhuhe02
 ; 两表 diff
 desc = 演示-两表 diff
 due_time = {BASETIME | dt_set(hour=9)}
-db_conf = palo_muse, palo_muse_new
+db_conf = mysql_test_db, mysql_test_db2
 sql =
     SELECT event_day, product, partner, sum(click) AS num
-    FROM pmc_all_channel_advertising
+    FROM table1
     WHERE event_day = '%(YESTERDAY)s'
     GROUP BY event_day, product, partner
     ::
     SELECT event_day, product, partner, sum(click) AS num
-    FROM pmc_all_channel_advertising
+    FROM table1
     WHERE event_day = '%(YESTERDAY)s'
     GROUP BY event_day, product, partner
 validator = diff(result[0], result[1], threshold=-1)
-alarm_hi = zhuhe02_02
-alarm_email = zhuhe02
+alarm_email = zhuhe212
 ```
 
 该示例的 `validator` 中使用了自定义校验函数 `diff`，该函数定义在 `data_monitor/user/validators.py` 中。
@@ -636,18 +620,18 @@ alarm_email = zhuhe02
 校验表达式：`diff(result[0], result[1], threshold=-1)`
 --------------------
 不合格的数据：
-     event_day           product        partner   num_1   num_2  diff
-0   2019-05-23            haokan           vivo  672798  672798     0
-1   2019-05-23  baiduboxapp_lite    yingyongbao       0       0     0
-2   2019-05-23  baiduboxapp_lite           oppo       0       0     0
-3   2019-05-23            haokan  guangdiantong  966881  966881     0
-4   2019-05-23       baiduboxapp          meizu   10760   10760     0
-..         ...               ...            ...     ...     ...   ...
-12  2019-05-23            haokan          meizu   74393   74393     0
-13  2019-05-23           quanmin         xiaomi       0       0     0
-14  2019-05-23       baiduboxapp    yingyongbao       0       0     0
-15  2019-05-23  baiduboxapp_lite         xiaomi   35858   35858     0
-16  2019-05-23           quanmin    yingyongbao       0       0     0
+     event_day  key1  key2   num_1   num_2  diff
+0   2019-05-23  k1v1  k2v1  672798  672798     0
+1   2019-05-23  k1v2  k2v2       0       0     0
+2   2019-05-23  k1v2  k2v3       0       0     0
+3   2019-05-23  k1v1  k2v4  966881  966881     0
+4   2019-05-23  k1v3  k2v5   10760   10760     0
+..         ...   ...   ...     ...     ...   ...
+12  2019-05-23  k1v1  k2v5   74393   74393     0
+13  2019-05-23  k1v4  k2v6       0       0     0
+14  2019-05-23  k1v3  k2v2       0       0     0
+15  2019-05-23  k1v2  k2v6   35858   35858     0
+16  2019-05-23  k1v4  k2v2       0       0     0
 ```
 
 `diff` 函数还可以接受一个额外的参数 `direction` 用于指定 diff 的方向，其取值为 `-1`、`0`、`1`，分别代表左表减右表、两表相减取绝对值、右表减左表，默认值为 `0`。
@@ -660,17 +644,16 @@ alarm_email = zhuhe02
 desc = 演示-小时级监控
 period = hour
 due_time = {BASETIME | dt_set(hour=6)}
-db_conf = mysql
+db_conf = mysql_test_db
 sql =
     SELECT count(*)
-    FROM ud_al_ps_insight_hour_province
+    FROM table2
     WHERE
         stat_date = %(TODAY)s
         ; 注意，这里使用 DUETIME 而不是 BASETIME！
         AND stat_hour = '{DUETIME | dt_add(hours=-6) | dt_format('%%H')}'
 validator = result > 0
-alarm_hi = zhuhe02_02
-alarm_email = zhuhe02
+alarm_email = zhuhe212
 ```
 
 该作业实现的功能是：每个小时检查六小时之前的那个小时的数据是否已就绪，如果未就绪则发出警报。
@@ -688,7 +671,7 @@ python main.py -j demo_hourly_job
 ```
 
 ```
-[2019-05-23 16:12:12,332] data_monitor INFO: using job config file(s): ['/home/work/zhuhe02/workspace/data-monitor/job.cfg']
+[2019-05-23 16:12:12,332] data_monitor INFO: using job config file(s): ['/home/work/zhuhe212/workspace/data-monitor/job.cfg']
 [2019-05-23 16:12:12,332] data_monitor INFO: checking job configs ...
 [2019-05-23 16:12:12,369] data_monitor INFO: job [demo_hourly_job_hour06] config OK.
 [2019-05-23 16:12:12,372] data_monitor INFO: job [demo_hourly_job_hour07] config OK.
