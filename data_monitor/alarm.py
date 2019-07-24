@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 """
-@Author:      zhuhe02
-@Email:       zhuhe02@baidu.com
-@Description: 报警模块。实现短信、邮件、百度Hi多种报警方式
+@Author:      zhuhe212
+@Email:       zhuhe212@163.com
+@Description: 报警模块。实现短信、邮件、即时通信工具等多种报警方式
 @CreateAt:    2019-04-01
 """
 
@@ -18,8 +18,8 @@ template_dir = os.path.join(cur_dir, 'templates')
 logger = logging.getLogger(__name__)
 
 
-def format_baidu_hi(job, info):
-    """生成百度 hi 消息。
+def format_text(job, info):
+    """生成文本消息，可用于即时通信工具。
     info 是一个 2-tuple (见 util.ValidateFailInfo)，两个字段的含义分别为：type、content。
     """
     try:
@@ -89,7 +89,7 @@ def format_baidu_hi(job, info):
     return msg
 
 
-def format_email(job, info):
+def format_html(job, info):
     """生成 html 邮件。对不同的消息类型使用不同的消息模板。
     info 是一个 2-tuple (见 util.ValidateFailInfo)，两个字段的含义分别为：type、content。
     """
@@ -141,45 +141,6 @@ def format_email(job, info):
     return msg
 
 
-def send_baidu_hi(to_users, msg):
-    """向百度Hi用户发送消息。
-    百度Hi每条消息最多支持 2KB，超长的消息需要做分割处理。
-    """
-
-    import requests
-
-    def split_msg(msg, blocksize=2048):
-        """将消息切块。
-        照顾到用户体验，尽量在换行处切割。如果一行内容超长，就只能在行内切割了。
-        """
-        if len(msg) <= blocksize:
-            return [msg]
-        chunk, msg = msg[:blocksize], msg[blocksize:]
-        index = chunk.rfind('\n')
-        if index == -1:
-            return [chunk] + split_msg(msg, blocksize=blocksize)
-        return [chunk[:index+1], split_msg(chunk[index+1:] + msg, blocksize=blocksize)]
-
-    msg = str(msg)
-    api_url = 'http://xp2.im.baidu.com/ext/1.0/sendMsg'
-    data = {
-        'access_token': '75d563d4277817b3c5e755ee8b164630',
-        'msg_type': 'text',
-    }
-
-    for user in to_users:
-        data['to'] = user
-        for m in split_msg(msg, 2048):
-            data['content'] = m
-            r = requests.post(api_url, data=data)
-            res = r.json()
-            if not res['result'].lower() == 'ok':
-                logger.error('failed sending BaiduHi message to user "{}". response: {!r}'.format(user, res))
-                break
-        else:
-            logger.info('succeeded sending BaiduHi message to user "{}"'.format(user))
-
-
 def send_email(to_users, msg):
     """向邮箱发送信息"""
 
@@ -188,8 +149,8 @@ def send_email(to_users, msg):
     import smtplib
 
     msg = str(msg)
-    from_addr = 'ssg_oppd_ta@baidu.com'
-    to_users = [s.strip() if '@' in s else s.strip() + '@baidu.com' for s in to_users]
+    from_addr = 'example_user@163.com'
+    to_users = [s.strip() if '@' in s else s.strip() + '@163.com' for s in to_users]
 
     mail_type = 'plain'
     if '</' in msg and '>' in msg:
@@ -199,6 +160,6 @@ def send_email(to_users, msg):
     mail['To'] = ','.join(to_users)
     mail['Subject'] = Header('数据监控警报', 'utf-8').encode()
 
-    server = smtplib.SMTP('proxy-in.baidu.com', 25)
+    server = smtplib.SMTP('smtp.163.com', 25)
     server.sendmail(from_addr, to_users, mail.as_string())
     server.quit()

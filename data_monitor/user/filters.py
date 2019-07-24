@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-@Author:      zhuhe02
-@Email:       zhuhe02@baidu.com
+@Author:      zhuhe212
+@Email:       zhuhe212@163.com
 @Description: 用户自定义 jiaja2 过滤器函数
 @CreateAt:    2019-03-31
 """

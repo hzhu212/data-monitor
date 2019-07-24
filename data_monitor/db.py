@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-@Author:      zhuhe02
-@Email:       zhuhe02@baidu.com
+@Author:      zhuhe212
+@Email:       zhuhe212@163.com
 @Description: 管理数据库连接，使用连接池提高连接复用
 @CreateAt:    2019-03-31
 """

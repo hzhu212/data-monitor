@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-@Author:      zhuhe02
-@Email:       zhuhe02@baidu.com
+@Author:      zhuhe212
+@Email:       zhuhe212@163.com
 @Description: 处理用户配置相关逻辑，该模块构建了一个配置层，使得配置文件的具体格式与主程序
               逻辑隔离。以防将来需要切换配置格式，比如切换成 JSON，只需要再实现对应的
               配置层（主要是 get_config_list 函数）即可，主程序逻辑无需更改。
@@ -23,7 +23,7 @@ except ImportError:
 
 import jinja2
 
-from .alarm import format_baidu_hi, send_baidu_hi, format_email, send_email
+from .alarm import format_html, send_email
 from .context import get_filter_context
 from .util import AlarmInfo
 
@@ -79,21 +79,19 @@ def check_out_job_config(job_conf, db_configs):
     except ConfigError as e:
         logger.error('job [{}] config error: {}'.format(job_conf['_name'], e))
         info = AlarmInfo('config_error', e)
-        send_baidu_hi(job_conf['alarm_hi'], format_baidu_hi(job_conf, info))
-        send_email(job_conf['alarm_email'], format_email(job_conf, info))
+        send_email(job_conf['alarm_email'], format_html(job_conf, info))
         return None
 
 
 def _check_out_job_config(job_conf, db_configs):
     """检查用户配置"""
 
-    # 首先将 alarm_hi、alarm_email 准备就绪，以便发生配置错误时可以报警
-    job_conf['alarm_hi'] = [s for s in job_conf['alarm_hi'].split(',')] if 'alarm_hi' in job_conf else []
+    # 首先将 alarm_email 准备就绪，以便发生配置错误时可以报警
     job_conf['alarm_email'] = [s for s in job_conf['alarm_email'].split(',')] if 'alarm_email' in job_conf else []
 
     # 检查必选配置项
     REQUIRED_OPTIONS = (
-        'desc', 'period', 'is_active', 'alarm_hi', 'alarm_email', 'due_time',
+        'desc', 'period', 'is_active', 'alarm_email', 'due_time',
         'db_conf', 'sql', 'validator', )
     for op in REQUIRED_OPTIONS:
         if op not in job_conf:

@@ -18,7 +18,7 @@ import traceback
 
 import pandas as pd
 
-from .alarm import format_baidu_hi, send_baidu_hi, format_email, send_email
+from .alarm import format_text, format_html, send_email
 from .config import get_job_conf_list
 from .context import get_validator_context
 from .db import get_connection
@@ -177,11 +177,10 @@ def main(db_config_file, job_config_files, job_names, pool_size=16, poll_interva
                         continue
 
                     # job 校验失败，发送报警，尝试重试 job
-                    baidu_hi_msg = format_baidu_hi(job, info_obj)
-                    indented_msg = '\t' + baidu_hi_msg.replace('\n', '\n\t')
+                    text_msg = format_text(job, info_obj)
+                    indented_msg = '\t' + text_msg.replace('\n', '\n\t')
                     logger.info('job [{}] returned. status: =====> ALARM <=====\n{}'.format(job['_name'], indented_msg))
-                    send_baidu_hi(job['alarm_hi'], baidu_hi_msg)
-                    send_email(job['alarm_email'], format_email(job, info_obj))
+                    send_email(job['alarm_email'], format_html(job, info_obj))
 
                     if job['retry_times'] > 0:
                         job['retry_times'] -= 1
